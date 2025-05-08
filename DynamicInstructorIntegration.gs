@@ -15,8 +15,7 @@
  * @return {Menu} The updated menu
  */
 function addDynamicInstructorMenuItems(menu) {
-  return menu.addItem('Create Dynamic Instructor Sheet', 'DynamicInstructorSheet.createDynamicInstructorSheet')
-             .addItem('Push Skills to Swimmer Records', 'DynamicInstructorSheet.pushSkillsToSwimmerRecords');
+  return menu.addItem('Create Instructor Sheet (Dynamic)', 'DynamicInstructorSheet.createDynamicInstructorSheet');
 }
 
 /**
@@ -31,12 +30,13 @@ function updateMenuWithDynamicInstructor() {
     const isInitialized = GlobalFunctions.safeGetProperty('systemInitialized') === 'true';
     
     if (isInitialized) {
-      menu.addSubMenu(ui.createMenu('Class Management')
-            .addItem('Update Class Selector', 'DataIntegrationModule_updateClassSelector')
-            .addItem('Refresh Roster Data', 'DataIntegrationModule_refreshRosterData')
-            .addItem('Update Instructor Data', 'DataIntegrationModule_updateInstructorData')
-            .addItem('Create Dynamic Instructor Sheet', 'DynamicInstructorSheet.createDynamicInstructorSheet')
-            .addItem('Push Skills to Swimmer Records', 'DynamicInstructorSheet.pushSkillsToSwimmerRecords'));
+      menu.addSubMenu(ui.createMenu('Instructor Tools')
+            .addItem('Create Instructor Sheet', 'DynamicInstructorSheet.createDynamicInstructorSheet')
+            .addItem('Update Class List', 'DataIntegrationModule_updateClassSelector'));
+      
+      menu.addSubMenu(ui.createMenu('Data Management')
+            .addItem('Refresh Daxko Data', 'DataIntegrationModule_refreshRosterData')
+            .addItem('Update Configuration', 'AdministrativeModule.showConfigDialog'));
     } else {
       menu.addItem('Initialize System', 'AdministrativeModule.showInitializationDialog');
     }
