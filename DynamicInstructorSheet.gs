@@ -27,7 +27,9 @@ const DYNAMIC_INSTRUCTOR_CONFIG = {
     SECTION_COLOR: '#E0E0E0',
     ATTENDANCE_COLOR: '#F0F8FF',
     STAGE_SKILLS_COLOR: '#F0FFF0',
-    SAW_SKILLS_COLOR: '#FFF0F0'
+    SAW_SKILLS_COLOR: '#FFF0F0',
+    BEFORE_COLUMN_COLOR: '#E6F2FF', // Light blue for 'Before' columns
+    AFTER_COLUMN_COLOR: '#FFEBCC'   // Light orange for 'After' columns
   },
   DAXKO_COLUMNS: {
     FIRST_NAME: 2, // Column C (0-indexed) - Student first name
@@ -271,9 +273,13 @@ function populateSheetWithClassData(sheet, selectedClass) {
     // Get class details from the selected class
     const classDetails = parseClassDetails(selectedClass);
     
-    // Add class header
+    // Extract stage from class name if possible (e.g., "S1" from "Swimming S1 Monday")
+    const stage = extractStageFromClassName(classDetails.program);
+    Logger.log(`Extracted stage: ${stage} from class: ${classDetails.program}`);
+    
+    // Add class header with stage info
     sheet.getRange('A2:Z2').merge()
-      .setValue(`Class: ${selectedClass}`)
+      .setValue(`Class: ${selectedClass}${stage ? ` - Stage ${stage}` : ''}`)
       .setFontWeight('bold')
       .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SECTION_COLOR)
       .setHorizontalAlignment('center');
@@ -282,10 +288,13 @@ function populateSheetWithClassData(sheet, selectedClass) {
     setupAttendanceColumns(sheet);
     
     // Get skills from swimmer records
-    const skills = getSkillsFromSwimmerRecords();
+    const allSkills = getSkillsFromSwimmerRecords();
     
-    // Add skills columns
-    setupSkillsColumns(sheet, skills);
+    // Filter skills by stage if possible
+    const filteredSkills = filterSkillsByStage(allSkills, stage);
+    
+    // Add skills columns with split for before/after tracking
+    setupSplitSkillsColumns(sheet, filteredSkills);
     
     // Get student roster for this class
     const students = getStudentsForClass(classDetails);
@@ -297,7 +306,7 @@ function populateSheetWithClassData(sheet, selectedClass) {
     }
     
     // Populate student data (even if it's just test/demo students)
-    populateStudentData(sheet, students, skills);
+    populateStudentData(sheet, students, filteredSkills);
     
   } catch (error) {
     Logger.log(`Error populating sheet with class data: ${error.message}`);
@@ -413,7 +422,31 @@ function getStudentsForClass(classDetails) {
     
     // Build search terms from class details
     const searchTerms = [];
-    if (classDetails.program) searchTerms.push(classDetails.program.toLowerCase().trim());
+    
+    // Extract key terms from program name
+    if (classDetails.program) {
+      // First add the entire program name
+      searchTerms.push(classDetails.program.toLowerCase().trim());
+      
+      // Then add individual significant words (avoiding common words like "the", "and")
+      const programWords = classDetails.program.toLowerCase().trim().split(/\s+/);
+      const skipWords = ['the', 'and', 'or', 'in', 'at', 'with', 'for'];
+      
+      for (const word of programWords) {
+        if (word.length > 2 && !skipWords.includes(word)) {
+          searchTerms.push(word);
+        }
+      }
+      
+      // Try to identify stage number in the program name
+      const stage = extractStageFromClassName(classDetails.program);
+      if (stage) {
+        searchTerms.push(`stage ${stage}`);
+        searchTerms.push(`s${stage}`);
+      }
+    }
+    
+    // Add day and time as search terms
     if (classDetails.day) searchTerms.push(classDetails.day.toLowerCase().trim());
     if (classDetails.time) {
       const timeParts = classDetails.time.toLowerCase().trim().split(' ');
@@ -425,10 +458,26 @@ function getStudentsForClass(classDetails) {
     const students = [];
     
     // Added a more flexible matching approach with expanded logging
-    // Start with more inclusive search to debug
     let matchCount = 0;
     let failedMatches = 0;
     const failedMatchExamples = [];
+    
+    // Get column indices for additional matching options
+    let activityNameCol = -1;
+    let activityTimeCol = -1;
+    
+    // Find columns with activity or class information if program/session not working
+    for (let i = 0; i < headers.length; i++) {
+      const header = headers[i]?.toString().toLowerCase() || '';
+      if (header.includes('activity') && header.includes('name')) {
+        activityNameCol = i;
+      }
+      if (header.includes('activity') && header.includes('time')) {
+        activityTimeCol = i;
+      }
+    }
+    
+    Logger.log(`Found additional matching columns: Activity Name: ${activityNameCol}, Activity Time: ${activityTimeCol}`);
     
     // Direct matching on program and session columns (W and X in Daxko sheet)
     for (let i = 1; i < daxkoData.length; i++) {
@@ -445,9 +494,11 @@ function getStudentsForClass(classDetails) {
       // Skip rows without names
       if (!firstName || !lastName) continue;
       
-      // Check if we can access the program/session columns
+      // Get all columns that might contain class information
       let rowProgram = '';
       let rowSession = '';
+      let activityName = '';
+      let activityTime = '';
       
       if (daxkoData[i].length > DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.PROGRAM) {
         rowProgram = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.PROGRAM];
@@ -457,59 +508,82 @@ function getStudentsForClass(classDetails) {
         rowSession = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION];
       }
       
-      // Convert to lowercase strings for consistent comparison
+      if (activityNameCol >= 0 && daxkoData[i].length > activityNameCol) {
+        activityName = daxkoData[i][activityNameCol];
+      }
+      
+      if (activityTimeCol >= 0 && daxkoData[i].length > activityTimeCol) {
+        activityTime = daxkoData[i][activityTimeCol];
+      }
+      
+      // Convert all fields to lowercase strings for consistent comparison
       const programStr = rowProgram ? rowProgram.toString().toLowerCase().trim() : '';
       const sessionStr = rowSession ? rowSession.toString().toLowerCase().trim() : '';
+      const activityNameStr = activityName ? activityName.toString().toLowerCase().trim() : '';
+      const activityTimeStr = activityTime ? activityTime.toString().toLowerCase().trim() : '';
+      
+      // Combine all fields for more comprehensive matching
+      const allFieldsStr = `${programStr} ${sessionStr} ${activityNameStr} ${activityTimeStr}`;
       
       // Debugging output - print first 5 students we check
       if (matchCount + failedMatches < 5) {
-        Logger.log(`Checking student: ${firstName} ${lastName}, Program: "${programStr}", Session: "${sessionStr}"`);
+        Logger.log(`Checking student: ${firstName} ${lastName}, Program: "${programStr}", Session: "${sessionStr}", Activity: "${activityNameStr} ${activityTimeStr}"`);
       }
       
-      // More flexible matching logic:
+      // Enhanced matching logic:
       let isMatch = false;
+      let matchReason = '';
       
-      // OPTION 1: Full match - all search terms must be present
-      let matchesAllTerms = true;
+      // STRATEGY 1: Full match - count how many search terms are present
+      let termMatches = 0;
+      let totalTerms = 0;
+      
       for (const term of searchTerms) {
         if (term.length < 3) continue; // Skip very short search terms
+        totalTerms++;
         
-        // Check if term is in program or session
-        if (!programStr.includes(term) && !sessionStr.includes(term)) {
-          matchesAllTerms = false;
-          break;
+        // Check if term is in any field
+        if (allFieldsStr.includes(term)) {
+          termMatches++;
         }
       }
       
-      if (matchesAllTerms) {
+      // If we match most of the search terms, consider it a match
+      if (totalTerms > 0 && termMatches >= Math.ceil(totalTerms * 0.6)) {
         isMatch = true;
+        matchReason = `Matched ${termMatches}/${totalTerms} search terms`;
       }
       
-      // OPTION 2: Partial match - if not all terms match but program is close enough
-      if (!isMatch && !matchesAllTerms && classDetails.program) {
-        const normalizedClassProgram = classDetails.program.toLowerCase().trim();
+      // STRATEGY 2: Class-specific matching - try to match the exact class name
+      if (!isMatch && classDetails.fullName) {
+        const normalizedClassName = classDetails.fullName.toLowerCase().trim();
         
-        // Check if program strings are similar enough
-        if (programStr && (
-            programStr.includes(normalizedClassProgram) || 
-            normalizedClassProgram.includes(programStr) ||
-            programStr.split(' ')[0] === normalizedClassProgram.split(' ')[0] // First word matches
-        )) {
-          // If program matches, check if any day/time info matches
-          if (classDetails.day && sessionStr.includes(classDetails.day.toLowerCase())) {
+        // Check if any field contains the full class name
+        if (allFieldsStr.includes(normalizedClassName)) {
+          isMatch = true;
+          matchReason = 'Matched full class name';
+        }
+        // Check for key components - program + day + time
+        else if (classDetails.program && classDetails.day && classDetails.time) {
+          const normalizedProgram = classDetails.program.toLowerCase().trim();
+          const normalizedDay = classDetails.day.toLowerCase().trim();
+          const normalizedTime = classDetails.time.toLowerCase().trim().split(' ')[0]; // Just time without AM/PM
+          
+          if (allFieldsStr.includes(normalizedProgram) && 
+              allFieldsStr.includes(normalizedDay) && 
+              allFieldsStr.includes(normalizedTime)) {
             isMatch = true;
-          } else if (classDetails.time && sessionStr.includes(classDetails.time.split(' ')[0].toLowerCase())) {
-            isMatch = true;
+            matchReason = 'Matched program + day + time';
           }
         }
       }
       
-      // OPTION 3: If no students found yet and this is a demo/test/development setup
-      if (searchTerms.length === 0 || classDetails.program.toLowerCase().includes('test')) {
+      // STRATEGY 3: For testing purposes
+      if (!isMatch && (searchTerms.length === 0 || classDetails.program.toLowerCase().includes('test'))) {
         // Add any student with valid name for testing
         if (firstName && lastName) {
           isMatch = true;
-          Logger.log(`Adding test student: ${firstName} ${lastName}`);
+          matchReason = 'Added for testing';
         }
       }
       
@@ -519,9 +593,10 @@ function getStudentsForClass(classDetails) {
           firstName: firstName,
           lastName: lastName,
           fullName: `${firstName} ${lastName}`, // Add full name for easier matching later
-          skills: {} // Will be populated later with skills from the Swimmer Records
+          skills: {}, // Will be populated later with skills from the Swimmer Records
+          matchReason: matchReason // For debugging
         });
-        Logger.log(`Found matching student: ${firstName} ${lastName}`);
+        Logger.log(`Found matching student: ${firstName} ${lastName} (${matchReason})`);
       } else {
         failedMatches++;
         if (failedMatchExamples.length < 3) {
@@ -539,17 +614,20 @@ function getStudentsForClass(classDetails) {
     // If no students found, create test students
     if (students.length === 0) {
       Logger.log('No students found for the selected class. Creating test students as fallback.');
+      const stage = extractStageFromClassName(classDetails.program) || '';
       students.push({
         firstName: 'Test',
-        lastName: 'Student1',
-        fullName: 'Test Student1',
-        skills: {}
+        lastName: stage ? `Student S${stage}` : 'Student1',
+        fullName: stage ? `Test Student S${stage}` : 'Test Student1',
+        skills: {},
+        matchReason: 'Test student'
       });
       students.push({
         firstName: 'Test',
-        lastName: 'Student2',
-        fullName: 'Test Student2',
-        skills: {}
+        lastName: stage ? `Student S${stage}-2` : 'Student2',
+        fullName: stage ? `Test Student S${stage}-2` : 'Test Student2',
+        skills: {},
+        matchReason: 'Test student'
       });
     }
     
@@ -688,7 +766,8 @@ function createFallbackSkills() {
     for (const skill of skillTypes) {
       skills.stage.push({
         index: index++,
-        header: `${stage} ${skill}`
+        header: `${stage} ${skill}`,
+        stage: stage.replace('S', '') // Extract numeric stage value
       });
     }
   }
@@ -707,40 +786,101 @@ function createFallbackSkills() {
 }
 
 /**
- * Sets up skills columns in the sheet
+ * Sets up skills columns with split before/after tracking
  * @param {Sheet} sheet - The instructor sheet
  * @param {Object} skills - The skills object
  */
-function setupSkillsColumns(sheet, skills) {
+function setupSplitSkillsColumns(sheet, skills) {
   // Calculate starting column for skills (after attendance columns)
   const startCol = 3 + DYNAMIC_INSTRUCTOR_CONFIG.HEADERS.ATTENDANCE_COUNT;
   
-  // Add stage skills headers
-  for (let i = 0; i < skills.stage.length; i++) {
-    const col = startCol + i;
-    sheet.getRange(3, col).setValue(skills.stage[i].header)
+  // Add row for subheaders (before/after)
+  sheet.insertRowAfter(2);
+  
+  // Add main header row for before/after
+  sheet.getRange(3, startCol, 1, skills.stage.length * 2).merge()
+    .setValue('Stage Skills - Before & After Evaluation')
+    .setFontWeight('bold')
+    .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.STAGE_SKILLS_COLOR)
+    .setHorizontalAlignment('center');
+  
+  // Add SAW header if we have SAW skills
+  if (skills.saw.length > 0) {
+    const sawStartCol = startCol + (skills.stage.length * 2);
+    sheet.getRange(3, sawStartCol, 1, skills.saw.length * 2).merge()
+      .setValue('Safety Around Water - Before & After Evaluation')
       .setFontWeight('bold')
-      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.STAGE_SKILLS_COLOR);
-    
-    // Set column width
-    sheet.setColumnWidth(col, 100);
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SAW_SKILLS_COLOR)
+      .setHorizontalAlignment('center');
   }
   
-  // Add SAW skills headers
-  const sawStartCol = startCol + skills.stage.length;
-  for (let i = 0; i < skills.saw.length; i++) {
-    const col = sawStartCol + i;
-    sheet.getRange(3, col).setValue(skills.saw[i].header)
+  // Add stage skills headers with Before/After columns
+  let currentCol = startCol;
+  for (let i = 0; i < skills.stage.length; i++) {
+    // Skill header
+    sheet.getRange(4, currentCol, 1, 2).merge()
+      .setValue(skills.stage[i].header)
       .setFontWeight('bold')
-      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SAW_SKILLS_COLOR);
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.STAGE_SKILLS_COLOR)
+      .setHorizontalAlignment('center');
     
-    // Set column width
-    sheet.setColumnWidth(col, 100);
+    // Before column 
+    sheet.getRange(5, currentCol).setValue('Before')
+      .setFontWeight('bold')
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.BEFORE_COLUMN_COLOR)
+      .setHorizontalAlignment('center');
+    
+    // After column
+    sheet.getRange(5, currentCol + 1).setValue('After')
+      .setFontWeight('bold')
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.AFTER_COLUMN_COLOR)
+      .setHorizontalAlignment('center');
+    
+    // Set column widths
+    sheet.setColumnWidth(currentCol, 80);
+    sheet.setColumnWidth(currentCol + 1, 80);
+    
+    // Move to next skill columns
+    currentCol += 2;
   }
+  
+  // Add SAW skills headers with Before/After columns
+  if (skills.saw.length > 0) {
+    for (let i = 0; i < skills.saw.length; i++) {
+      // Skill header
+      sheet.getRange(4, currentCol, 1, 2).merge()
+        .setValue(skills.saw[i].header)
+        .setFontWeight('bold')
+        .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SAW_SKILLS_COLOR)
+        .setHorizontalAlignment('center');
+      
+      // Before column 
+      sheet.getRange(5, currentCol).setValue('Before')
+        .setFontWeight('bold')
+        .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.BEFORE_COLUMN_COLOR)
+        .setHorizontalAlignment('center');
+      
+      // After column
+      sheet.getRange(5, currentCol + 1).setValue('After')
+        .setFontWeight('bold')
+        .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.AFTER_COLUMN_COLOR)
+        .setHorizontalAlignment('center');
+      
+      // Set column widths
+      sheet.setColumnWidth(currentCol, 80);
+      sheet.setColumnWidth(currentCol + 1, 80);
+      
+      // Move to next skill columns
+      currentCol += 2;
+    }
+  }
+  
+  // Update frozen rows to include all header rows
+  sheet.setFrozenRows(5);
 }
 
 /**
- * Populates student data and existing skills
+ * Populates student data and existing skills with split before/after columns
  * @param {Sheet} sheet - The instructor sheet
  * @param {Array} students - Array of student objects from the selected class only
  * @param {Object} skills - Skills configuration
@@ -753,9 +893,12 @@ function populateStudentData(sheet, students, skills) {
     // Log student count for debugging
     Logger.log(`Populating data for ${students.length} students from the selected class`);
     
+    // Account for the additional header rows we added
+    const startRow = 6; // After all header rows
+    
     // Add students to the sheet - only those from the selected class
     for (let i = 0; i < students.length; i++) {
-      const rowIndex = i + 4; // Start at row 4 (after headers)
+      const rowIndex = i + startRow; // Start after all header rows
       
       // Add student name
       sheet.getRange(rowIndex, 1).setValue(students[i].firstName);
@@ -769,7 +912,7 @@ function populateStudentData(sheet, students, skills) {
       // Apply checkbox data validation to attendance cells
       attendanceRange.insertCheckboxes();
       
-      // Add existing skills if available
+      // Calculate starting column for skills (after attendance columns)
       const skillsStartCol = 3 + DYNAMIC_INSTRUCTOR_CONFIG.HEADERS.ATTENDANCE_COUNT;
       
       // Find student in skillsData by name
@@ -777,25 +920,36 @@ function populateStudentData(sheet, students, skills) {
         s.firstName.toString().toLowerCase().trim() === students[i].firstName.toString().toLowerCase().trim() && 
         s.lastName.toString().toLowerCase().trim() === students[i].lastName.toString().toLowerCase().trim());
       
+      // Add existing skills values in the "Before" columns if available
       if (student) {
-        // Add stage skills
+        // Add stage skills in the "Before" columns (every 2 columns)
+        let currentSkillColumn = skillsStartCol;
         for (let j = 0; j < skills.stage.length; j++) {
           const skillHeader = skills.stage[j].header;
           if (student.skills[skillHeader]) {
-            sheet.getRange(rowIndex, skillsStartCol + j).setValue(student.skills[skillHeader]);
+            // Put existing skill value in the "Before" column
+            sheet.getRange(rowIndex, currentSkillColumn).setValue(student.skills[skillHeader]);
           }
+          currentSkillColumn += 2; // Skip the "After" column
         }
         
-        // Add SAW skills
-        const sawStartCol = skillsStartCol + skills.stage.length;
+        // Add SAW skills in the "Before" columns (every 2 columns)
+        const sawStartCol = skillsStartCol + (skills.stage.length * 2);
+        currentSkillColumn = sawStartCol;
         for (let j = 0; j < skills.saw.length; j++) {
           const skillHeader = skills.saw[j].header;
           if (student.skills[skillHeader]) {
-            sheet.getRange(rowIndex, sawStartCol + j).setValue(student.skills[skillHeader]);
+            // Put existing skill value in the "Before" column
+            sheet.getRange(rowIndex, currentSkillColumn).setValue(student.skills[skillHeader]);
           }
+          currentSkillColumn += 2; // Skip the "After" column
         }
       }
     }
+    
+    // Add validation for skill cells
+    addSkillValidation(sheet, startRow, students.length, skills);
+    
   } catch (error) {
     Logger.log(`Error populating student data: ${error.message}`);
     throw error;
@@ -932,7 +1086,146 @@ function getStudentSkillsFromSwimmerRecords(students) {
   }
 }
 
-// Function removed as no longer needed with the simplified matching approach
+/**
+ * Extracts the stage number from a class name
+ * @param {string} className - The class name to extract from
+ * @return {string} The extracted stage number or empty string if not found
+ */
+function extractStageFromClassName(className) {
+  if (!className) return '';
+  
+  // Convert to string and lowercase for consistent processing
+  const normalizedName = className.toString().toLowerCase().trim();
+  
+  // Pattern 1: Look for "Stage X" in the name
+  let stageMatch = normalizedName.match(/stage\s*([1-6])/i);
+  if (stageMatch && stageMatch[1]) {
+    return stageMatch[1];
+  }
+  
+  // Pattern 2: Look for "SX" format (e.g., S1, S2, etc.)
+  stageMatch = normalizedName.match(/\bs([1-6])\b/i);
+  if (stageMatch && stageMatch[1]) {
+    return stageMatch[1];
+  }
+  
+  // Pattern 3: Look for "X" where X is a digit 1-6 that might be stage
+  // Only use this if it's likely to be referring to a stage
+  if (normalizedName.includes('swim') || 
+      normalizedName.includes('aqua') || 
+      normalizedName.includes('water')) {
+    stageMatch = normalizedName.match(/\b([1-6])\b/);
+    if (stageMatch && stageMatch[1]) {
+      return stageMatch[1];
+    }
+  }
+  
+  return '';
+}
+
+/**
+ * Filters skills by stage based on the class name
+ * @param {Object} allSkills - The complete skills object 
+ * @param {string} stage - Stage number to filter by
+ * @return {Object} Filtered skills object
+ */
+function filterSkillsByStage(allSkills, stage) {
+  // If no stage specified or no skills available, return all skills
+  if (!stage || !allSkills) {
+    return allSkills;
+  }
+  
+  Logger.log(`Filtering skills for stage ${stage}`);
+  
+  const result = {
+    stage: [],
+    saw: allSkills.saw || [] // Keep all SAW skills
+  };
+  
+  // Only include skills for the specified stage and prior stages
+  if (allSkills.stage && allSkills.stage.length > 0) {
+    for (const skill of allSkills.stage) {
+      // Extract the stage number from the skill header (e.g., 'S1 Float' → '1')
+      const skillStage = skill.stage || extractStageFromSkillHeader(skill.header);
+      
+      // Include skills from current stage and optionally the previous stage
+      if (skillStage === stage || skillStage === String(parseInt(stage) - 1)) {
+        result.stage.push(skill);
+      }
+    }
+  }
+  
+  Logger.log(`Filtered ${result.stage.length} stage skills and kept ${result.saw.length} SAW skills`);
+  
+  // If we didn't find any skills for this stage, return all skills
+  if (result.stage.length === 0) {
+    Logger.log('No skills found for specified stage, returning all skills');
+    return allSkills;
+  }
+  
+  return result;
+}
+
+/**
+ * Extracts stage number from a skill header
+ * @param {string} header - The skill header
+ * @return {string} The stage number or empty string
+ */
+function extractStageFromSkillHeader(header) {
+  if (!header) return '';
+  
+  // Check for common patterns like 'S1' at the beginning
+  const match = header.toString().match(/^S([1-6])\s/);
+  if (match && match[1]) {
+    return match[1];
+  }
+  
+  return '';
+}
+
+/**
+ * Adds data validation for skill cells
+ * @param {Sheet} sheet - The sheet to modify
+ * @param {number} startRow - The starting row for student data
+ * @param {number} studentCount - The number of students
+ * @param {Object} skills - The skills configuration object
+ */
+function addSkillValidation(sheet, startRow, studentCount, skills) {
+  if (studentCount <= 0) return;
+  
+  // Skill validation options
+  const skillOptions = ['', 'X', '/', '?', 'N/A'];
+  
+  // Create a data validation rule
+  const rule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(skillOptions, true)
+    .setAllowInvalid(false)
+    .build();
+  
+  // Calculate start and end columns for skills
+  const skillsStartCol = 3 + DYNAMIC_INSTRUCTOR_CONFIG.HEADERS.ATTENDANCE_COUNT;
+  const totalSkillsColumns = (skills.stage.length * 2) + (skills.saw.length * 2);
+  
+  // Apply validation to all skill cells
+  if (totalSkillsColumns > 0) {
+    const validationRange = sheet.getRange(
+      startRow, 
+      skillsStartCol, 
+      studentCount, 
+      totalSkillsColumns
+    );
+    
+    validationRange.setDataValidation(rule);
+    
+    // Add note explaining values
+    validationRange.setNote(
+      'X = Achieved\n' +
+      '/ = In Progress\n' +
+      '? = Not Yet Assessed\n' +
+      'N/A = Not Applicable'
+    );
+  }
+}
 
 // Function removed as per requirement to eliminate pushing data back to Swimmer Records
 
