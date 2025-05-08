@@ -58,7 +58,26 @@ function createDynamicInstructorSheet() {
       sheet.clear();
       sheet.clearFormats();
       sheet.clearConditionalFormatRules();
-      sheet.clearDataValidations();
+      
+      // Clear data validations manually since clearDataValidations() might not be available
+      try {
+        // Try using clearDataValidations if available
+        if (typeof sheet.clearDataValidations === 'function') {
+          sheet.clearDataValidations();
+        } else {
+          // Fallback method: clear validation range by range
+          const totalRows = sheet.getMaxRows();
+          const totalCols = sheet.getMaxColumns();
+          // Clear validations in smaller chunks to avoid timeout
+          for (let startRow = 1; startRow <= totalRows; startRow += 20) {
+            const rowsToProcess = Math.min(20, totalRows - startRow + 1);
+            sheet.getRange(startRow, 1, rowsToProcess, totalCols).setDataValidation(null);
+          }
+        }
+      } catch (e) {
+        Logger.log(`Error clearing data validations: ${e.message}. Continuing anyway.`);
+        // Continue with the rest of the initialization
+      }
       
       // Reset all column widths to default
       const totalColumns = sheet.getMaxColumns();
@@ -1267,8 +1286,16 @@ function addSkillValidation(sheet, startRow, studentCount, skills) {
   if (studentCount <= 0) return;
   
   try {
-    // Check if this is a private lesson sheet by looking for 'Private Lesson:' in cell A2
-    const headerText = sheet.getRange('A2').getValue().toString();
+    // Check if we can access the header
+    let headerText = '';
+    try {
+      headerText = sheet.getRange('A2').getValue().toString();
+    } catch (e) {
+      Logger.log(`Error accessing header: ${e.message}`);
+      // Continue but assume it's not a private lesson
+      headerText = '';
+    }
+    
     if (headerText.indexOf('Private Lesson:') >= 0) {
       // Don't format for private lessons
       return;
@@ -1335,8 +1362,19 @@ function addSkillValidation(sheet, startRow, studentCount, skills) {
 function setupPrivateLessonLayout(sheet, classDetails) {
   try {
     // First clear any existing data validation to avoid errors
-    const fullSheetRange = sheet.getDataRange();
-    fullSheetRange.clearDataValidations();
+    try {
+      const fullSheetRange = sheet.getDataRange();
+      // Try using clearDataValidations if available
+      if (typeof fullSheetRange.clearDataValidations === 'function') {
+        fullSheetRange.clearDataValidations();
+      } else {
+        // Fallback: clear validation by setting to null
+        fullSheetRange.setDataValidation(null);
+      }
+    } catch (validationError) {
+      Logger.log(`Error clearing data validations: ${validationError.message}. Continuing anyway.`);
+      // Continue with the setup process
+    }
     
     // Clear all content except the class selector in row 1
     clearStudentData(sheet);
