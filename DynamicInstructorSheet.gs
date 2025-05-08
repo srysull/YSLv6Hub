@@ -413,8 +413,14 @@ function populateSheetWithClassData(sheet, selectedClass) {
       .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SECTION_COLOR)
       .setHorizontalAlignment('center');
     
-    // Add attendance columns
-    setupAttendanceColumns(sheet);
+    // Get student roster for this class first (we need this regardless of skills)
+    const students = getStudentsForClass(classDetails);
+      
+    // Display info message if no students, but continue with empty roster
+    if (students.length === 0) {
+      // This will be overwritten if test students get added
+      sheet.getRange('A4').setValue('No students found in Daxko for this class. Add students manually or check class details.');
+    }
     
     try {
       // Get skills from swimmer records (wrap in try-catch to handle errors gracefully)
@@ -426,37 +432,36 @@ function populateSheetWithClassData(sheet, selectedClass) {
       // Add skills columns with split for before/after tracking
       setupSplitSkillsColumns(sheet, filteredSkills);
       
-      // Get student roster for this class
-      const students = getStudentsForClass(classDetails);
-      
-      // Display info message if no students, but continue with empty roster
-      if (students.length === 0) {
-        // This will be overwritten if test students get added
-        sheet.getRange('A4').setValue('No students found in Daxko for this class. Add students manually or check class details.');
-      }
-      
-      // Populate student data (even if it's just test/demo students)
+      // Populate student data with skills
       populateStudentData(sheet, students, filteredSkills);
     } catch (skillError) {
       // Handle errors with skills or swimmer records gracefully
       Logger.log(`Error loading skills data: ${skillError.message}`);
       
-      // Set up a simplified version without skills
-      sheet.getRange('A4').setValue(`Note: Skills data couldn't be loaded. Using simplified layout.`);
+      // Even if skills failed to load, we still need to set up attendance
+      // and ensure students are displayed
       
-      // Still get the student roster
-      const students = getStudentsForClass(classDetails);
+      // Create a simplified skill set for students that still has the right structure
+      const fallbackSkills = {
+        stage: [],
+        saw: []
+      };
       
-      // Add student names in a simplified format
-      if (students.length > 0) {
-        for (let i = 0; i < students.length; i++) {
-          const rowIndex = i + 5; // Start after the note
-          sheet.getRange(rowIndex, 1).setValue(students[i].firstName);
-          sheet.getRange(rowIndex, 2).setValue(students[i].lastName);
-        }
-      } else {
-        sheet.getRange('A5').setValue('No students found. Add students manually or check class details.');
-      }
+      // Add attendance columns which are needed regardless of skills
+      setupAttendanceColumns(sheet);
+      
+      // Set up some basic skill columns so the sheet has structure
+      setupSplitSkillsColumns(sheet, fallbackSkills);
+      
+      // Populate student data with empty skills (but with attendance)
+      populateStudentData(sheet, students, fallbackSkills);
+      
+      // Show an error message that doesn't interfere with the sheet
+      SpreadsheetApp.getUi().alert(
+        'Skills Data Not Available',
+        'Note: Skills data could not be loaded from Swimmer Records, but students and attendance have been added.',
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
     }
   } catch (error) {
     Logger.log(`Error populating sheet with class data: ${error.message}`);
@@ -818,14 +823,28 @@ function setupAttendanceColumns(sheet) {
 function getSkillsFromSwimmerRecords() {
   try {
     // Get Swimmer Records URL from properties
-    const swimmerRecordsUrl = GlobalFunctions.safeGetProperty(CONFIG.SWIMMER_RECORDS_URL);
+    let swimmerRecordsUrl;
+    try {
+      swimmerRecordsUrl = GlobalFunctions.safeGetProperty(CONFIG.SWIMMER_RECORDS_URL);
+    } catch (propError) {
+      Logger.log(`Error accessing CONFIG: ${propError.message}`);
+      return createFallbackSkills();
+    }
+    
     if (!swimmerRecordsUrl) {
       Logger.log('Swimmer Records URL not found in system configuration');
       return createFallbackSkills();
     }
     
     // Extract spreadsheet ID from URL
-    const ssId = GlobalFunctions.extractIdFromUrl(swimmerRecordsUrl);
+    let ssId;
+    try {
+      ssId = GlobalFunctions.extractIdFromUrl(swimmerRecordsUrl);
+    } catch (urlError) {
+      Logger.log(`Error extracting ID from URL: ${urlError.message}`);
+      return createFallbackSkills();
+    }
+    
     if (!ssId) {
       Logger.log('Invalid Swimmer Records URL');
       return createFallbackSkills();
