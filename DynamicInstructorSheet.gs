@@ -689,15 +689,18 @@ function setupSkillsColumns(sheet, skills) {
 /**
  * Populates student data and existing skills
  * @param {Sheet} sheet - The instructor sheet
- * @param {Array} students - Array of student objects
+ * @param {Array} students - Array of student objects from the selected class only
  * @param {Object} skills - Skills configuration
  */
 function populateStudentData(sheet, students, skills) {
   try {
-    // Get student skills from Swimmer Records
+    // Get student skills from Swimmer Records - but only for students in this class
     const studentSkills = getStudentSkillsFromSwimmerRecords(students);
     
-    // Add students to the sheet
+    // Log student count for debugging
+    Logger.log(`Populating data for ${students.length} students from the selected class`);
+    
+    // Add students to the sheet - only those from the selected class
     for (let i = 0; i < students.length; i++) {
       const rowIndex = i + 4; // Start at row 4 (after headers)
       
@@ -711,9 +714,14 @@ function populateStudentData(sheet, students, skills) {
       const skillsStartCol = 3 + DYNAMIC_INSTRUCTOR_CONFIG.HEADERS.ATTENDANCE_COUNT;
       
       // Find student in skillsData
-      const student = studentSkills.find(s => 
-        s.firstName === students[i].firstName && 
-        s.lastName === students[i].lastName);
+      const student = studentSkills.find(s => {
+        // Use more robust name matching to account for possible name variations
+        const firstNameMatch = s.firstName.toString().toLowerCase().trim() === 
+                              students[i].firstName.toString().toLowerCase().trim();
+        const lastNameMatch = s.lastName.toString().toLowerCase().trim() === 
+                             students[i].lastName.toString().toLowerCase().trim();
+        return firstNameMatch && lastNameMatch;
+      });
       
       if (student) {
         // Add stage skills
@@ -741,8 +749,10 @@ function populateStudentData(sheet, students, skills) {
 }
 
 /**
- * Gets existing student skills from the Swimmer Records Workbook
- * @param {Array} students - Array of student objects
+ * Gets existing student skills from the Swimmer Records Workbook,
+ * but only returns data for students in the provided students array
+ * 
+ * @param {Array} students - Array of student objects from selected class
  * @return {Array} Array of students with their skills
  */
 function getStudentSkillsFromSwimmerRecords(students) {
@@ -768,7 +778,7 @@ function getStudentSkillsFromSwimmerRecords(students) {
     }
     
     // Log which students we're looking for
-    Logger.log(`Looking up skills for ${students.length} students`);
+    Logger.log(`Looking up skills for ${students.length} students in the selected class`);
     students.forEach(student => {
       Logger.log(`- ${student.firstName} ${student.lastName}`);
     });
@@ -802,20 +812,57 @@ function getStudentSkillsFromSwimmerRecords(students) {
     const headers = recordsData[0];
     Logger.log(`Swimmer Records has ${recordsData.length} rows, ${headers.length} columns`);
     
-    // Find skills for each student using a more flexible matching approach
+    // Find skills ONLY for students in our class list (students parameter)
     const studentSkills = [];
+    
+    // Create a map of normalized student names from our class for quick lookup
+    const classStudentNames = new Map();
+    for (const student of students) {
+      const normalizedFirstName = student.firstName.toString().toLowerCase().trim();
+      const normalizedLastName = student.lastName.toString().toLowerCase().trim();
+      const fullName = `${normalizedFirstName} ${normalizedLastName}`;
+      classStudentNames.set(fullName, true);
+    }
     
     // Create a map of names to skills for efficient lookup
     const skillsByName = new Map();
     
-    // First, try exact matches
+    // First, try exact matches, but only for students in our class
     for (let i = 1; i < recordsData.length; i++) {
       const firstName = recordsData[i][0];
       const lastName = recordsData[i][1];
       
       if (!firstName || !lastName) continue;
       
-      const fullName = `${firstName.toString().toLowerCase().trim()} ${lastName.toString().toLowerCase().trim()}`;
+      // Normalize for comparison
+      const normalizedFirstName = firstName.toString().toLowerCase().trim();
+      const normalizedLastName = lastName.toString().toLowerCase().trim();
+      const fullName = `${normalizedFirstName} ${normalizedLastName}`;
+      
+      // Only include this student if they're in our class student list
+      if (!classStudentNames.has(fullName)) {
+        // Try to match with first name and first letter of last name
+        let isMatch = false;
+        
+        for (const [classStudentName] of classStudentNames) {
+          const nameParts = classStudentName.split(' ');
+          if (nameParts.length < 2) continue;
+          
+          const classFirstName = nameParts[0];
+          const classLastInitial = nameParts[1].charAt(0);
+          
+          if (normalizedFirstName === classFirstName && 
+              normalizedLastName.charAt(0) === classLastInitial) {
+            isMatch = true;
+            break;
+          }
+        }
+        
+        if (!isMatch) {
+          // Skip this student, they're not in our class
+          continue;
+        }
+      }
       
       // Store skills for this student
       const skills = {};
@@ -836,6 +883,8 @@ function getStudentSkillsFromSwimmerRecords(students) {
         lastName: lastName,
         skills: skills
       });
+      
+      Logger.log(`Found skills for ${firstName} ${lastName} from Swimmer Records`);
     }
     
     // Now look up each of our students
@@ -849,7 +898,6 @@ function getStudentSkillsFromSwimmerRecords(students) {
       if (skillsByName.has(fullName)) {
         const skillData = skillsByName.get(fullName);
         studentSkills.push(skillData);
-        Logger.log(`Found exact match for ${student.firstName} ${student.lastName}`);
         continue;
       }
       
