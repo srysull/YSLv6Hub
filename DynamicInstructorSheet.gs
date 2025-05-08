@@ -49,25 +49,51 @@ function createDynamicInstructorSheet() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName(DYNAMIC_INSTRUCTOR_CONFIG.SHEET_NAME);
     
-    // Create the sheet if it doesn't exist
+    // Create the sheet if it doesn't exist or completely reset it if it does
     if (!sheet) {
+      // Create a new sheet
       sheet = ss.insertSheet(DYNAMIC_INSTRUCTOR_CONFIG.SHEET_NAME);
-      
-      // Set up the basic structure
-      setupSheetStructure(sheet);
-      
-      // Create class selector dropdown
-      createClassSelector(sheet);
     } else {
-      // If sheet already exists, just clear student data below the headers
-      // but preserve class selector and any previously selected class
-      clearStudentData(sheet);
+      // Clear everything from the existing sheet
+      sheet.clear();
+      sheet.clearFormats();
+      sheet.clearConditionalFormatRules();
+      sheet.clearDataValidations();
       
-      // Make sure the class selector is still there, if not recreate it
-      if (!sheet.getRange('C1').getDataValidation()) {
-        createClassSelector(sheet);
+      // Reset all column widths to default
+      const totalColumns = sheet.getMaxColumns();
+      for (let i = 1; i <= totalColumns; i++) {
+        sheet.setColumnWidth(i, 100); // Reset to default width
       }
+      
+      // Reset all row heights to default
+      const totalRows = sheet.getMaxRows();
+      for (let i = 1; i <= totalRows; i++) {
+        sheet.setRowHeight(i, 21); // Reset to default height
+      }
+      
+      // Ensure there are enough rows and columns
+      const minRows = 100;
+      const minColumns = 30;
+      
+      if (sheet.getMaxRows() < minRows) {
+        sheet.insertRowsAfter(sheet.getMaxRows(), minRows - sheet.getMaxRows());
+      }
+      
+      if (sheet.getMaxColumns() < minColumns) {
+        sheet.insertColumnsAfter(sheet.getMaxColumns(), minColumns - sheet.getMaxColumns());
+      }
+      
+      // Unhide any hidden rows or columns
+      sheet.showRows(1, sheet.getMaxRows());
+      sheet.showColumns(1, sheet.getMaxColumns());
     }
+    
+    // Set up the basic structure from scratch
+    setupSheetStructure(sheet);
+    
+    // Create class selector dropdown
+    createClassSelector(sheet);
     
     // Add onEdit trigger for the sheet
     ensureTriggerExists();
@@ -1312,42 +1338,11 @@ function setupPrivateLessonLayout(sheet, classDetails) {
     const fullSheetRange = sheet.getDataRange();
     fullSheetRange.clearDataValidations();
     
-    // Clear existing student data
+    // Clear all content except the class selector in row 1
     clearStudentData(sheet);
     
-    // Preserve the class selector in row 1
-    
-    // Set up session date - get from Daxko if available
-    let sessionDate = '';
-    try {
-      const ss = SpreadsheetApp.getActiveSpreadsheet();
-      const daxkoSheet = ss.getSheetByName(DYNAMIC_INSTRUCTOR_CONFIG.ROSTER_SHEET_NAME);
-      if (daxkoSheet) {
-        // Look for any matching student in this class
-        const daxkoData = daxkoSheet.getDataRange().getValues();
-        for (let i = 1; i < daxkoData.length; i++) {
-          const rowProgram = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.PROGRAM];
-          const rowSession = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION];
-          
-          // Check if this row matches our class
-          if (rowProgram && rowSession && 
-              classDetails.fullName.toLowerCase().includes(rowProgram.toString().toLowerCase()) ||
-              classDetails.fullName.toLowerCase().includes(rowSession.toString().toLowerCase())) {
-            // Found a match, get session date
-            if (daxkoData[i].length > DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION_DATE) {
-              const rowDate = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION_DATE];
-              if (rowDate) {
-                sessionDate = rowDate;
-                break;
-              }
-            }
-          }
-        }
-      }
-    } catch (dateError) {
-      Logger.log(`Error getting session date: ${dateError.message}`);
-      // Continue without session date
-    }
+    // Get all students and lesson dates from Daxko for this private lesson
+    const studentsWithDates = getPrivateLessonStudentsWithDates(classDetails);
     
     // Add class info in row 2 (don't merge to preserve layout)
     sheet.getRange('A2').setValue('Private Lesson:')
@@ -1357,17 +1352,6 @@ function setupPrivateLessonLayout(sheet, classDetails) {
     sheet.getRange('B2').setValue(classDetails.fullName)
       .setFontWeight('bold')
       .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SECTION_COLOR);
-    
-    // Add session date if available
-    if (sessionDate) {
-      sheet.getRange('C2').setValue('Date:')
-        .setFontWeight('bold')
-        .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SECTION_COLOR);
-        
-      sheet.getRange('D2').setValue(sessionDate)
-        .setFontWeight('bold')
-        .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SECTION_COLOR);
-    }
     
     // Set up simplified headers for private lessons
     // First name
@@ -1382,14 +1366,20 @@ function setupPrivateLessonLayout(sheet, classDetails) {
       .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
       .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
     
+    // Date column
+    sheet.getRange('C3').setValue('Lesson Date')
+      .setFontWeight('bold')
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
+      .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
+    
     // Instructor
-    sheet.getRange('C3').setValue('Instructor')
+    sheet.getRange('D3').setValue('Instructor')
       .setFontWeight('bold')
       .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
       .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
     
     // Notes
-    sheet.getRange('D3').setValue('Notes')
+    sheet.getRange('E3').setValue('Notes')
       .setFontWeight('bold')
       .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
       .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
@@ -1397,49 +1387,50 @@ function setupPrivateLessonLayout(sheet, classDetails) {
     // Set column widths
     sheet.setColumnWidth(1, 150); // First Name
     sheet.setColumnWidth(2, 150); // Last Name
-    sheet.setColumnWidth(3, 150); // Instructor
-    sheet.setColumnWidth(4, 300); // Notes
+    sheet.setColumnWidth(3, 120); // Date
+    sheet.setColumnWidth(4, 150); // Instructor
+    sheet.setColumnWidth(5, 300); // Notes
     
     // Hide unused columns
-    if (sheet.getMaxColumns() > 5) {
-      sheet.hideColumns(5, sheet.getMaxColumns() - 4);
+    if (sheet.getMaxColumns() > 6) {
+      sheet.hideColumns(6, sheet.getMaxColumns() - 5);
     }
     
     // Freeze the header rows
     sheet.setFrozenRows(3);
     
-    // Get student roster for this private lesson
-    const students = getStudentsForClass(classDetails);
-    
     // Calculate actual rows needed - use actual students found or minimum 5
-    const actualRowsNeeded = Math.max(5, students.length);
+    const actualRowsNeeded = Math.max(5, studentsWithDates.length);
     
-    // Format instructor and notes columns to be centered
-    const dataRowsRange = sheet.getRange(4, 1, actualRowsNeeded, 4);
+    // Format all data columns to be centered
+    const dataRowsRange = sheet.getRange(4, 1, actualRowsNeeded, 5);
     dataRowsRange.setHorizontalAlignment('center');
     dataRowsRange.setVerticalAlignment('middle');
     
     // Add student data if available
-    if (students.length === 0) {
+    if (studentsWithDates.length === 0) {
       // Add empty rows for manual entry
       for (let i = 0; i < actualRowsNeeded; i++) {
         const rowIndex = i + 4; // Start after header rows
         sheet.getRange(rowIndex, 1).setValue('');
         sheet.getRange(rowIndex, 2).setValue('');
+        sheet.getRange(rowIndex, 3).setValue('');
       }
     } else {
-      // Add existing students and empty rows
+      // Add existing students with dates and empty rows
       for (let i = 0; i < actualRowsNeeded; i++) {
         const rowIndex = i + 4; // Start after header rows
         
-        if (i < students.length) {
-          // Add student name
-          sheet.getRange(rowIndex, 1).setValue(students[i].firstName);
-          sheet.getRange(rowIndex, 2).setValue(students[i].lastName);
+        if (i < studentsWithDates.length) {
+          // Add student name and date
+          sheet.getRange(rowIndex, 1).setValue(studentsWithDates[i].firstName);
+          sheet.getRange(rowIndex, 2).setValue(studentsWithDates[i].lastName);
+          sheet.getRange(rowIndex, 3).setValue(studentsWithDates[i].date);
         } else {
           // Add empty row for manual entry
           sheet.getRange(rowIndex, 1).setValue('');
           sheet.getRange(rowIndex, 2).setValue('');
+          sheet.getRange(rowIndex, 3).setValue('');
         }
       }
     }
@@ -1447,7 +1438,7 @@ function setupPrivateLessonLayout(sheet, classDetails) {
     // Add alternating row colors for better readability
     for (let i = 0; i < actualRowsNeeded; i++) {
       if (i % 2 === 1) { // Odd rows (0-based index, so rows 5, 7, 9, etc.)
-        sheet.getRange(i + 4, 1, 1, 4).setBackground('#f3f3f3'); // Light gray
+        sheet.getRange(i + 4, 1, 1, 5).setBackground('#f3f3f3'); // Light gray
       }
     }
     
@@ -1462,6 +1453,118 @@ function setupPrivateLessonLayout(sheet, classDetails) {
     Logger.log(`Error setting up private lesson layout: ${error.message}`);
     sheet.getRange('A4').setValue(`Error creating private lesson layout: ${error.message}`);
     throw error;
+  }
+}
+
+/**
+ * Gets private lesson students with their lesson dates, sorted by date (soonest first)
+ * @param {Object} classDetails - The private lesson details
+ * @return {Array} Array of student objects with dates
+ */
+function getPrivateLessonStudentsWithDates(classDetails) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const daxkoSheet = ss.getSheetByName(DYNAMIC_INSTRUCTOR_CONFIG.ROSTER_SHEET_NAME);
+    
+    if (!daxkoSheet) {
+      throw new Error(`${DYNAMIC_INSTRUCTOR_CONFIG.ROSTER_SHEET_NAME} sheet not found. Please make sure the Daxko sheet exists.`);
+    }
+    
+    // Get all roster data from Daxko sheet
+    const daxkoData = daxkoSheet.getDataRange().getValues();
+    const studentsWithDates = [];
+    
+    // Process Daxko data to find private lesson students with dates
+    for (let i = 1; i < daxkoData.length; i++) {
+      // Check for sufficient data in this row
+      if (daxkoData[i].length <= Math.max(
+          DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.FIRST_NAME,
+          DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.LAST_NAME,
+          DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.PROGRAM,
+          DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION,
+          DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION_DATE)) {
+        continue;
+      }
+      
+      const firstName = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.FIRST_NAME];
+      const lastName = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.LAST_NAME];
+      const rowProgram = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.PROGRAM];
+      const rowSession = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION];
+      const rowDate = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION_DATE];
+      
+      // Skip rows without names or dates
+      if (!firstName || !lastName) continue;
+      
+      // Normalize for comparison
+      const normalizedClassName = classDetails.fullName.toLowerCase().trim();
+      const normalizedProgram = rowProgram ? rowProgram.toString().toLowerCase().trim() : '';
+      const normalizedSession = rowSession ? rowSession.toString().toLowerCase().trim() : '';
+      
+      // Check if this student is in the private lesson
+      if ((normalizedProgram && normalizedClassName.includes(normalizedProgram)) ||
+          (normalizedSession && normalizedClassName.includes(normalizedSession)) ||
+          (normalizedProgram && normalizedProgram.includes('private'))) {
+        
+        // Format date for display - convert date object to string if needed
+        let formattedDate = '';
+        if (rowDate) {
+          if (rowDate instanceof Date) {
+            formattedDate = Utilities.formatDate(rowDate, Session.getScriptTimeZone(), 'MM/dd/yyyy');
+          } else {
+            formattedDate = rowDate.toString();
+          }
+        }
+        
+        studentsWithDates.push({
+          firstName: firstName,
+          lastName: lastName,
+          date: formattedDate,
+          // Store the original date for sorting
+          rawDate: rowDate instanceof Date ? rowDate : null
+        });
+      }
+    }
+    
+    // Sort students by date (soonest first)
+    studentsWithDates.sort(function(a, b) {
+      // If we have raw dates, use them for sorting
+      if (a.rawDate && b.rawDate) {
+        return a.rawDate - b.rawDate;
+      }
+      
+      // Fall back to string comparison if raw dates not available
+      if (a.date && b.date) {
+        return a.date.localeCompare(b.date);
+      }
+      
+      // Put entries with dates before entries without dates
+      if (a.date && !b.date) return -1;
+      if (!a.date && b.date) return 1;
+      
+      // If no dates available, sort by name
+      return (a.firstName + a.lastName).localeCompare(b.firstName + b.lastName);
+    });
+    
+    Logger.log(`Found ${studentsWithDates.length} private lesson students with dates`);
+    
+    // If no students found, create a fallback student
+    if (studentsWithDates.length === 0) {
+      studentsWithDates.push({
+        firstName: 'Private',
+        lastName: 'Student',
+        date: ''
+      });
+    }
+    
+    return studentsWithDates;
+  } catch (error) {
+    Logger.log(`Error getting private lesson students: ${error.message}`);
+    // Return a test student as fallback
+    return [{
+      firstName: 'Test',
+      lastName: 'Student',
+      date: ''
+    }];
   }
 }
 
