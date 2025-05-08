@@ -35,7 +35,8 @@ const DYNAMIC_INSTRUCTOR_CONFIG = {
     FIRST_NAME: 2, // Column C (0-indexed) - Student first name
     LAST_NAME: 3,  // Column D - Student last name
     PROGRAM: 22,   // Column W - Program name/description
-    SESSION: 23    // Column X - Session details (day/time)
+    SESSION: 23,   // Column X - Session details (day/time)
+    SESSION_DATE: 27 // Column AB - Session date
   }
 };
 
@@ -51,16 +52,22 @@ function createDynamicInstructorSheet() {
     // Create the sheet if it doesn't exist
     if (!sheet) {
       sheet = ss.insertSheet(DYNAMIC_INSTRUCTOR_CONFIG.SHEET_NAME);
+      
+      // Set up the basic structure
+      setupSheetStructure(sheet);
+      
+      // Create class selector dropdown
+      createClassSelector(sheet);
     } else {
-      // Clear existing content but keep the sheet
-      sheet.clear();
+      // If sheet already exists, just clear student data below the headers
+      // but preserve class selector and any previously selected class
+      clearStudentData(sheet);
+      
+      // Make sure the class selector is still there, if not recreate it
+      if (!sheet.getRange('C1').getDataValidation()) {
+        createClassSelector(sheet);
+      }
     }
-    
-    // Set up the basic structure
-    setupSheetStructure(sheet);
-    
-    // Create class selector dropdown
-    createClassSelector(sheet);
     
     // Add onEdit trigger for the sheet
     ensureTriggerExists();
@@ -1224,7 +1231,7 @@ function extractStageFromSkillHeader(header) {
 }
 
 /**
- * Adds data validation for skill cells
+ * Formats skill cells without adding data validation (using simple text format)
  * @param {Sheet} sheet - The sheet to modify
  * @param {number} startRow - The starting row for student data
  * @param {number} studentCount - The number of students
@@ -1237,45 +1244,58 @@ function addSkillValidation(sheet, startRow, studentCount, skills) {
     // Check if this is a private lesson sheet by looking for 'Private Lesson:' in cell A2
     const headerText = sheet.getRange('A2').getValue().toString();
     if (headerText.indexOf('Private Lesson:') >= 0) {
-      // Don't add validation for private lessons
+      // Don't format for private lessons
       return;
     }
-    
-    // Skill validation options
-    const skillOptions = ['', 'X', '/', '?', 'N/A'];
-    
-    // Create a data validation rule
-    const rule = SpreadsheetApp.newDataValidation()
-      .requireValueInList(skillOptions, true)
-      .setAllowInvalid(true) // Changed to true to avoid errors if invalid data entered
-      .build();
     
     // Calculate start and end columns for skills
     const skillsStartCol = 3 + DYNAMIC_INSTRUCTOR_CONFIG.HEADERS.ATTENDANCE_COUNT;
     const totalSkillsColumns = (skills.stage.length * 2) + (skills.saw.length * 2);
     
-    // Apply validation to all skill cells
+    // Format the skill cells (but don't add validation dropdown)
     if (totalSkillsColumns > 0) {
-      const validationRange = sheet.getRange(
+      const skillCellsRange = sheet.getRange(
         startRow, 
         skillsStartCol, 
         studentCount, 
         totalSkillsColumns
       );
       
-      validationRange.setDataValidation(rule);
+      // Set formatting for the skills cells (center alignment, no validation)
+      skillCellsRange.setHorizontalAlignment('center');
+      skillCellsRange.setVerticalAlignment('middle');
       
-      // Add note explaining values to the first cell only to avoid cluttering the sheet
-      sheet.getRange(startRow, skillsStartCol).setNote(
-        'X = Achieved\n' +
-        '/ = In Progress\n' +
-        '? = Not Yet Assessed\n' +
-        'N/A = Not Applicable'
-      );
+      // Add note explaining values to the header row to guide instructors
+      const headerNote = 'Suggested values for skill cells:\n' +
+                        'X = Achieved\n' +
+                        '/ = In Progress\n' +
+                        '? = Not Yet Assessed\n' +
+                        'N/A = Not Applicable';
+      
+      // Add the note to the skills section headers
+      sheet.getRange(3, skillsStartCol).setNote(headerNote);
+      
+      // If there are SAW skills, add the note to that header too
+      if (skills.saw.length > 0) {
+        const sawStartCol = skillsStartCol + (skills.stage.length * 2);
+        sheet.getRange(3, sawStartCol).setNote(headerNote);
+      }
+    }
+    
+    // Hide any unused columns to clean up the sheet
+    const requiredColumns = skillsStartCol + totalSkillsColumns;
+    if (sheet.getMaxColumns() > requiredColumns + 1) { // +1 for buffer
+      sheet.hideColumns(requiredColumns + 1, sheet.getMaxColumns() - requiredColumns);
+    }
+    
+    // Hide any unused rows to clean up the sheet
+    const requiredRows = startRow + studentCount;
+    if (sheet.getMaxRows() > requiredRows + 3) { // +3 for buffer
+      sheet.hideRows(requiredRows + 1, sheet.getMaxRows() - requiredRows);
     }
   } catch (error) {
     // Log the error but don't fail the whole function
-    Logger.log(`Error adding skill validation: ${error.message}`);
+    Logger.log(`Error formatting skill cells: ${error.message}`);
   }
 }
 
@@ -1292,15 +1312,62 @@ function setupPrivateLessonLayout(sheet, classDetails) {
     const fullSheetRange = sheet.getDataRange();
     fullSheetRange.clearDataValidations();
     
-    // Clear existing content but keep the sheet
-    sheet.clear();
+    // Clear existing student data
+    clearStudentData(sheet);
     
-    // Add class header with private lesson info
-    sheet.getRange('A2:Z2').merge()
-      .setValue(`Private Lesson: ${classDetails.fullName}`)
+    // Preserve the class selector in row 1
+    
+    // Set up session date - get from Daxko if available
+    let sessionDate = '';
+    try {
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const daxkoSheet = ss.getSheetByName(DYNAMIC_INSTRUCTOR_CONFIG.ROSTER_SHEET_NAME);
+      if (daxkoSheet) {
+        // Look for any matching student in this class
+        const daxkoData = daxkoSheet.getDataRange().getValues();
+        for (let i = 1; i < daxkoData.length; i++) {
+          const rowProgram = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.PROGRAM];
+          const rowSession = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION];
+          
+          // Check if this row matches our class
+          if (rowProgram && rowSession && 
+              classDetails.fullName.toLowerCase().includes(rowProgram.toString().toLowerCase()) ||
+              classDetails.fullName.toLowerCase().includes(rowSession.toString().toLowerCase())) {
+            // Found a match, get session date
+            if (daxkoData[i].length > DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION_DATE) {
+              const rowDate = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION_DATE];
+              if (rowDate) {
+                sessionDate = rowDate;
+                break;
+              }
+            }
+          }
+        }
+      }
+    } catch (dateError) {
+      Logger.log(`Error getting session date: ${dateError.message}`);
+      // Continue without session date
+    }
+    
+    // Add class info in row 2 (don't merge to preserve layout)
+    sheet.getRange('A2').setValue('Private Lesson:')
       .setFontWeight('bold')
-      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SECTION_COLOR)
-      .setHorizontalAlignment('center');
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SECTION_COLOR);
+    
+    sheet.getRange('B2').setValue(classDetails.fullName)
+      .setFontWeight('bold')
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SECTION_COLOR);
+    
+    // Add session date if available
+    if (sessionDate) {
+      sheet.getRange('C2').setValue('Date:')
+        .setFontWeight('bold')
+        .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SECTION_COLOR);
+        
+      sheet.getRange('D2').setValue(sessionDate)
+        .setFontWeight('bold')
+        .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SECTION_COLOR);
+    }
     
     // Set up simplified headers for private lessons
     // First name
@@ -1333,31 +1400,36 @@ function setupPrivateLessonLayout(sheet, classDetails) {
     sheet.setColumnWidth(3, 150); // Instructor
     sheet.setColumnWidth(4, 300); // Notes
     
+    // Hide unused columns
+    if (sheet.getMaxColumns() > 5) {
+      sheet.hideColumns(5, sheet.getMaxColumns() - 4);
+    }
+    
     // Freeze the header rows
     sheet.setFrozenRows(3);
     
     // Get student roster for this private lesson
     const students = getStudentsForClass(classDetails);
     
-    // Prepare for student data entry - add more rows if needed
-    const rowsToAdd = Math.max(10, students.length); // Ensure at least 10 rows for manual entry
+    // Calculate actual rows needed - use actual students found or minimum 5
+    const actualRowsNeeded = Math.max(5, students.length);
     
     // Format instructor and notes columns to be centered
-    const dataRowsRange = sheet.getRange(4, 1, rowsToAdd, 4);
+    const dataRowsRange = sheet.getRange(4, 1, actualRowsNeeded, 4);
     dataRowsRange.setHorizontalAlignment('center');
     dataRowsRange.setVerticalAlignment('middle');
     
     // Add student data if available
     if (students.length === 0) {
       // Add empty rows for manual entry
-      for (let i = 0; i < rowsToAdd; i++) {
+      for (let i = 0; i < actualRowsNeeded; i++) {
         const rowIndex = i + 4; // Start after header rows
         sheet.getRange(rowIndex, 1).setValue('');
         sheet.getRange(rowIndex, 2).setValue('');
       }
     } else {
       // Add existing students and empty rows
-      for (let i = 0; i < rowsToAdd; i++) {
+      for (let i = 0; i < actualRowsNeeded; i++) {
         const rowIndex = i + 4; // Start after header rows
         
         if (i < students.length) {
@@ -1373,10 +1445,16 @@ function setupPrivateLessonLayout(sheet, classDetails) {
     }
     
     // Add alternating row colors for better readability
-    for (let i = 0; i < rowsToAdd; i++) {
+    for (let i = 0; i < actualRowsNeeded; i++) {
       if (i % 2 === 1) { // Odd rows (0-based index, so rows 5, 7, 9, etc.)
         sheet.getRange(i + 4, 1, 1, 4).setBackground('#f3f3f3'); // Light gray
       }
+    }
+    
+    // Hide any unused rows
+    const totalRowsOnSheet = sheet.getMaxRows();
+    if (totalRowsOnSheet > actualRowsNeeded + 3) { // +3 for header rows
+      sheet.hideRows(actualRowsNeeded + 4, totalRowsOnSheet - (actualRowsNeeded + 3));
     }
     
     Logger.log('Private lesson layout successfully created');
