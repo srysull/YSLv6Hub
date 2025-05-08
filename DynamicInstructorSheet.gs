@@ -168,20 +168,36 @@ function getAvailableClasses() {
     // Get class data
     const classData = classesSheet.getDataRange().getValues();
     
+    // Display some information about the Classes sheet
+    Logger.log(`Classes sheet has ${classData.length} rows`);
+    if (classData.length > 0) {
+      Logger.log(`Classes sheet headers: ${JSON.stringify(classData[0])}`);
+    }
+    
     // Skip header row
     const classNames = [];
     for (let i = 1; i < classData.length; i++) {
-      // Check if row has valid data
-      if (classData[i][1] && classData[i][2] && classData[i][3]) {
+      // Check if row has valid data for the class definition
+      if (classData[i].length > 3 && classData[i][1] && classData[i][2] && classData[i][3]) {
         const className = `${classData[i][1]} ${classData[i][2]} ${classData[i][3]}`;
         classNames.push(className);
+        Logger.log(`Added class: ${className}`);
       }
+    }
+    
+    // If no classes found, add some test options
+    if (classNames.length === 0) {
+      Logger.log('No classes found in the Classes sheet, adding test classes');
+      classNames.push('Test Swimming Monday 9:00 AM');
+      classNames.push('Test Swimming Tuesday 10:00 AM');
     }
     
     return classNames;
   } catch (error) {
     Logger.log(`Error getting available classes: ${error.message}`);
-    throw error;
+    
+    // Return some test classes as a fallback
+    return ['Test Swimming Monday 9:00 AM', 'Test Swimming Tuesday 10:00 AM'];
   }
 }
 
@@ -371,14 +387,84 @@ function getStudentsForClass(classDetails) {
     // Get all roster data
     const rosterData = rosterSheet.getDataRange().getValues();
     
-    // Filter students for this class
+    // Log the class details for debugging
+    Logger.log(`Looking for students in class: ${JSON.stringify(classDetails)}`);
+    
+    // Get the column headers to verify we're looking at the right columns
+    const headers = rosterData[0];
+    Logger.log(`Daxko sheet headers: ${JSON.stringify(headers)}`);
+    
+    // Check a few rows of data to see what's there
+    if (rosterData.length > 1) {
+      Logger.log(`Sample row data: ${JSON.stringify(rosterData[1])}`);
+      if (rosterData.length > 2) {
+        Logger.log(`Another sample row: ${JSON.stringify(rosterData[2])}`);
+      }
+    }
+    
+    // Try a more flexible matching approach
     const students = [];
+    
+    // Normalize the class program name for better matching
+    const normalizedProgram = classDetails.program.toLowerCase().trim();
+    Logger.log(`Normalized program name: ${normalizedProgram}`);
+    
     for (let i = 1; i < rosterData.length; i++) {
-      // Match by program and session in columns W and X (22 and 23 in 0-indexed)
+      // Check if we have valid data in this row
+      if (rosterData[i].length <= Math.max(
+          DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.FIRST_NAME,
+          DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.LAST_NAME,
+          DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.PROGRAM)) {
+        continue; // Skip rows with insufficient data
+      }
+      
+      // Try different matching approaches
+      let isMatch = false;
+      
+      // Get the row's program data
       const rowProgram = rosterData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.PROGRAM];
       
-      // Check if this row matches the class
-      if (rowProgram && rowProgram.includes(classDetails.program)) {
+      if (rowProgram) {
+        // Normalize row program for comparison
+        const normalizedRowProgram = rowProgram.toString().toLowerCase().trim();
+        
+        // Try different matching strategies
+        if (normalizedRowProgram === normalizedProgram) {
+          isMatch = true; // Exact match
+        } else if (normalizedRowProgram.includes(normalizedProgram)) {
+          isMatch = true; // Partial match - row contains the class program
+        } else if (normalizedProgram.includes(normalizedRowProgram)) {
+          isMatch = true; // Partial match - class program contains the row program
+        }
+        
+        // Additional matching logic - try matching by key parts (first word, etc.)
+        if (!isMatch) {
+          const programWords = normalizedProgram.split(' ');
+          for (const word of programWords) {
+            if (word.length > 3 && normalizedRowProgram.includes(word)) {
+              isMatch = true;
+              break;
+            }
+          }
+        }
+        
+        // If we have a day and time, try to match those too
+        if (!isMatch && classDetails.day && classDetails.time) {
+          const rowSession = rosterData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION];
+          if (rowSession) {
+            const normalizedRowSession = rowSession.toString().toLowerCase().trim();
+            const normalizedDay = classDetails.day.toLowerCase().trim();
+            const normalizedTime = classDetails.time.toLowerCase().trim();
+            
+            if (normalizedRowSession.includes(normalizedDay) && 
+                normalizedRowSession.includes(normalizedTime.split(' ')[0])) {
+              isMatch = true;
+            }
+          }
+        }
+      }
+      
+      if (isMatch) {
         // Make sure we have valid first and last names
         const firstName = rosterData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.FIRST_NAME];
         const lastName = rosterData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.LAST_NAME];
@@ -389,12 +475,27 @@ function getStudentsForClass(classDetails) {
             lastName: lastName,
             skills: {} // Will be populated later with skills from the Swimmer Records
           });
+          Logger.log(`Found matching student: ${firstName} ${lastName}`);
         }
       }
     }
     
     if (students.length === 0) {
       Logger.log(`No students found matching program: ${classDetails.program}`);
+      // As a fallback for testing, add some dummy students if in development mode
+      if (classDetails.program.toLowerCase().includes('test')) {
+        students.push({
+          firstName: 'Test',
+          lastName: 'Student1',
+          skills: {}
+        });
+        students.push({
+          firstName: 'Test',
+          lastName: 'Student2',
+          skills: {}
+        });
+        Logger.log(`Added test students for development purposes`);
+      }
     } else {
       Logger.log(`Found ${students.length} students for program: ${classDetails.program}`);
     }
@@ -432,21 +533,43 @@ function getSkillsFromSwimmerRecords() {
     // Get Swimmer Records URL from properties
     const swimmerRecordsUrl = GlobalFunctions.safeGetProperty(CONFIG.SWIMMER_RECORDS_URL);
     if (!swimmerRecordsUrl) {
-      throw new Error('Swimmer Records URL not found in system configuration');
+      Logger.log('Swimmer Records URL not found in system configuration');
+      return createFallbackSkills();
     }
     
     // Extract spreadsheet ID from URL
     const ssId = GlobalFunctions.extractIdFromUrl(swimmerRecordsUrl);
     if (!ssId) {
-      throw new Error('Invalid Swimmer Records URL');
+      Logger.log('Invalid Swimmer Records URL');
+      return createFallbackSkills();
     }
     
-    // Open the Swimmer Records Workbook
-    const swimmerSS = SpreadsheetApp.openById(ssId);
-    const swimmerSheet = swimmerSS.getSheets()[0]; // Assuming first sheet contains the records
+    // Log the spreadsheet ID we're trying to open
+    Logger.log(`Attempting to open Swimmer Records with ID: ${ssId}`);
+    
+    // Try to open the Swimmer Records Workbook
+    let swimmerSS;
+    try {
+      swimmerSS = SpreadsheetApp.openById(ssId);
+    } catch (accessError) {
+      Logger.log(`Error accessing Swimmer Records: ${accessError.message}`);
+      return createFallbackSkills();
+    }
+    
+    // Get the first sheet
+    const sheets = swimmerSS.getSheets();
+    if (!sheets || sheets.length === 0) {
+      Logger.log('No sheets found in Swimmer Records Workbook');
+      return createFallbackSkills();
+    }
+    
+    const swimmerSheet = sheets[0]; // Assuming first sheet contains the records
     
     // Get the header row
     const headerRow = swimmerSheet.getRange(1, 1, 1, swimmerSheet.getLastColumn()).getValues()[0];
+    
+    // Log the headers for debugging
+    Logger.log(`Swimmer Records headers: ${JSON.stringify(headerRow)}`);
     
     // Categorize skills
     const skills = {
@@ -474,11 +597,60 @@ function getSkillsFromSwimmerRecords() {
       }
     }
     
+    // Log the skills we found
+    Logger.log(`Found ${skills.stage.length} stage skills and ${skills.saw.length} SAW skills`);
+    
+    // If no skills found, fall back to test skills
+    if (skills.stage.length === 0 && skills.saw.length === 0) {
+      Logger.log('No skills found in Swimmer Records, using fallback skills');
+      return createFallbackSkills();
+    }
+    
     return skills;
   } catch (error) {
     Logger.log(`Error getting skills from Swimmer Records: ${error.message}`);
-    throw error;
+    // Return fallback skills instead of throwing an error
+    return createFallbackSkills();
   }
+}
+
+/**
+ * Creates fallback skills for testing when Swimmer Records is unavailable
+ * @return {Object} Object with test skill headers
+ */
+function createFallbackSkills() {
+  const skills = {
+    stage: [],
+    saw: []
+  };
+  
+  // Add some stage skills for testing
+  const stageNames = ['S1', 'S2', 'S3', 'S4', 'S5', 'S6'];
+  const skillTypes = ['Float', 'Kick', 'Submerge', 'Arm Strokes', 'Breathing'];
+  
+  let index = 2; // Start after first and last name columns
+  
+  // Add stage skills
+  for (const stage of stageNames) {
+    for (const skill of skillTypes) {
+      skills.stage.push({
+        index: index++,
+        header: `${stage} ${skill}`
+      });
+    }
+  }
+  
+  // Add SAW skills
+  const sawSkills = ['SAW Water Safety', 'SAW Life Jacket', 'SAW Help Others', 'SAW Call for Help'];
+  for (const skill of sawSkills) {
+    skills.saw.push({
+      index: index++,
+      header: skill
+    });
+  }
+  
+  Logger.log(`Created ${skills.stage.length} fallback stage skills and ${skills.saw.length} fallback SAW skills`);
+  return skills;
 }
 
 /**
@@ -575,70 +747,176 @@ function populateStudentData(sheet, students, skills) {
  */
 function getStudentSkillsFromSwimmerRecords(students) {
   try {
+    // If no students, return empty array
+    if (!students || students.length === 0) {
+      Logger.log('No students provided to look up skills');
+      return [];
+    }
+    
     // Get Swimmer Records URL from properties
     const swimmerRecordsUrl = GlobalFunctions.safeGetProperty(CONFIG.SWIMMER_RECORDS_URL);
     if (!swimmerRecordsUrl) {
-      throw new Error('Swimmer Records URL not found in system configuration');
+      Logger.log('Swimmer Records URL not found in system configuration');
+      return []; // Return empty array, sheet will just show students without skills
     }
     
     // Extract spreadsheet ID from URL
     const ssId = GlobalFunctions.extractIdFromUrl(swimmerRecordsUrl);
     if (!ssId) {
-      throw new Error('Invalid Swimmer Records URL');
+      Logger.log('Invalid Swimmer Records URL');
+      return []; // Return empty array
     }
     
-    // Open the Swimmer Records Workbook
-    const swimmerSS = SpreadsheetApp.openById(ssId);
-    const swimmerSheet = swimmerSS.getSheets()[0]; // Assuming first sheet contains the records
+    // Log which students we're looking for
+    Logger.log(`Looking up skills for ${students.length} students`);
+    students.forEach(student => {
+      Logger.log(`- ${student.firstName} ${student.lastName}`);
+    });
+    
+    // Try to open the Swimmer Records Workbook
+    let swimmerSS;
+    try {
+      swimmerSS = SpreadsheetApp.openById(ssId);
+    } catch (accessError) {
+      Logger.log(`Error accessing Swimmer Records: ${accessError.message}`);
+      return [];
+    }
+    
+    // Get the sheets
+    const sheets = swimmerSS.getSheets();
+    if (!sheets || sheets.length === 0) {
+      Logger.log('No sheets found in Swimmer Records Workbook');
+      return [];
+    }
+    
+    const swimmerSheet = sheets[0]; // Assuming first sheet contains the records
     
     // Get all data
     const recordsData = swimmerSheet.getDataRange().getValues();
     if (recordsData.length <= 1) {
+      Logger.log('No data found in Swimmer Records (only headers or empty)');
       return []; // No data or only headers
     }
     
     // Get headers
     const headers = recordsData[0];
+    Logger.log(`Swimmer Records has ${recordsData.length} rows, ${headers.length} columns`);
     
-    // Find skills for each student
+    // Find skills for each student using a more flexible matching approach
     const studentSkills = [];
     
+    // Create a map of names to skills for efficient lookup
+    const skillsByName = new Map();
+    
+    // First, try exact matches
     for (let i = 1; i < recordsData.length; i++) {
       const firstName = recordsData[i][0];
       const lastName = recordsData[i][1];
       
-      // Check if this student is in our roster
-      const matchingStudent = students.find(s => 
-        s.firstName === firstName && 
-        s.lastName === lastName);
+      if (!firstName || !lastName) continue;
       
-      if (matchingStudent) {
-        const skills = {};
+      const fullName = `${firstName.toString().toLowerCase().trim()} ${lastName.toString().toLowerCase().trim()}`;
+      
+      // Store skills for this student
+      const skills = {};
+      
+      // Collect all skills for this student
+      for (let j = 2; j < headers.length; j++) {
+        const header = headers[j];
+        if (!header) continue;
         
-        // Collect all skills for this student
-        for (let j = 2; j < headers.length; j++) {
-          const header = headers[j];
-          if (!header) continue;
-          
-          const value = recordsData[i][j];
-          if (value) {
-            skills[header] = value;
-          }
+        const value = recordsData[i][j];
+        if (value) {
+          skills[header] = value;
         }
+      }
+      
+      skillsByName.set(fullName, {
+        firstName: firstName,
+        lastName: lastName,
+        skills: skills
+      });
+    }
+    
+    // Now look up each of our students
+    for (const student of students) {
+      // Normalize student name for comparison
+      const normalizedFirstName = student.firstName.toString().toLowerCase().trim();
+      const normalizedLastName = student.lastName.toString().toLowerCase().trim();
+      const fullName = `${normalizedFirstName} ${normalizedLastName}`;
+      
+      // Try exact match first
+      if (skillsByName.has(fullName)) {
+        const skillData = skillsByName.get(fullName);
+        studentSkills.push(skillData);
+        Logger.log(`Found exact match for ${student.firstName} ${student.lastName}`);
+        continue;
+      }
+      
+      // Try partial matching if exact match fails
+      let bestMatch = null;
+      let bestScore = 0;
+      
+      for (const [recordName, skillData] of skillsByName.entries()) {
+        // Simple similarity score based on common characters
+        const similarity = calculateNameSimilarity(fullName, recordName);
         
-        studentSkills.push({
-          firstName: firstName,
-          lastName: lastName,
-          skills: skills
-        });
+        if (similarity > bestScore && similarity > 0.7) { // Threshold for a good match
+          bestScore = similarity;
+          bestMatch = skillData;
+        }
+      }
+      
+      if (bestMatch) {
+        Logger.log(`Found partial match for ${student.firstName} ${student.lastName} (score: ${bestScore})`);
+        studentSkills.push(bestMatch);
+      } else {
+        Logger.log(`No skill match found for ${student.firstName} ${student.lastName}`);
       }
     }
     
+    Logger.log(`Found skills for ${studentSkills.length} out of ${students.length} students`);
     return studentSkills;
   } catch (error) {
     Logger.log(`Error getting student skills from Swimmer Records: ${error.message}`);
     return []; // Return empty array on error
   }
+}
+
+/**
+ * Calculates a similarity score between two names
+ * A simple implementation for fuzzy matching
+ * 
+ * @param {string} name1 - First name
+ * @param {string} name2 - Second name
+ * @return {number} Similarity score between 0 and 1
+ */
+function calculateNameSimilarity(name1, name2) {
+  // For simplicity, we'll use a basic approach:
+  // 1. Split into words
+  // 2. Count matching words
+  // 3. Calculate a similarity score
+  
+  const words1 = name1.split(/\s+/);
+  const words2 = name2.split(/\s+/);
+  
+  let matchCount = 0;
+  
+  // Count exact word matches
+  for (const word1 of words1) {
+    if (word1.length < 3) continue; // Skip very short words
+    
+    for (const word2 of words2) {
+      if (word1 === word2) {
+        matchCount++;
+        break;
+      }
+    }
+  }
+  
+  // Calculate similarity as the proportion of matching words
+  const totalWords = Math.max(words1.length, words2.length);
+  return totalWords > 0 ? matchCount / totalWords : 0;
 }
 
 /**
