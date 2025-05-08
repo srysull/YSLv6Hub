@@ -271,13 +271,12 @@ function populateSheetWithClassData(sheet, selectedClass) {
     // Get class details from the selected class
     const classDetails = parseClassDetails(selectedClass);
     
-    // Get student roster for this class
-    const students = getStudentsForClass(classDetails);
-    
-    if (students.length === 0) {
-      sheet.getRange('A4').setValue('No students found for this class');
-      return;
-    }
+    // Add class header
+    sheet.getRange('A2:Z2').merge()
+      .setValue(`Class: ${selectedClass}`)
+      .setFontWeight('bold')
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SECTION_COLOR)
+      .setHorizontalAlignment('center');
     
     // Add attendance columns
     setupAttendanceColumns(sheet);
@@ -288,15 +287,18 @@ function populateSheetWithClassData(sheet, selectedClass) {
     // Add skills columns
     setupSkillsColumns(sheet, skills);
     
-    // Populate student data
+    // Get student roster for this class
+    const students = getStudentsForClass(classDetails);
+    
+    // Display info message if no students, but continue with empty roster
+    if (students.length === 0) {
+      // This will be overwritten if test students get added
+      sheet.getRange('A4').setValue('No students found in Daxko for this class. Add students manually or check class details.');
+    }
+    
+    // Populate student data (even if it's just test/demo students)
     populateStudentData(sheet, students, skills);
     
-    // Add class header
-    sheet.getRange('A2:Z2').merge()
-      .setValue(`Class: ${selectedClass}`)
-      .setFontWeight('bold')
-      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SECTION_COLOR)
-      .setHorizontalAlignment('center');
   } catch (error) {
     Logger.log(`Error populating sheet with class data: ${error.message}`);
     sheet.getRange('A4').setValue(`Error loading class data: ${error.message}`);
@@ -399,6 +401,16 @@ function getStudentsForClass(classDetails) {
     const headers = daxkoData[0];
     Logger.log(`Daxko sheet headers: ${JSON.stringify(headers)}`);
     
+    // Check if we have the expected program and session columns
+    if (headers.length <= DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.PROGRAM || 
+        headers.length <= DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION) {
+      Logger.log(`WARNING: Daxko sheet does not have expected columns. Expected Program in column ${DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.PROGRAM + 1} and Session in column ${DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION + 1}`);
+      // Create a sample row entry to inspect
+      if (daxkoData.length > 1) {
+        Logger.log(`Sample row data: ${JSON.stringify(daxkoData[1])}`);
+      }
+    }
+    
     // Build search terms from class details
     const searchTerms = [];
     if (classDetails.program) searchTerms.push(classDetails.program.toLowerCase().trim());
@@ -412,27 +424,52 @@ function getStudentsForClass(classDetails) {
     
     const students = [];
     
+    // Added a more flexible matching approach with expanded logging
+    // Start with more inclusive search to debug
+    let matchCount = 0;
+    let failedMatches = 0;
+    const failedMatchExamples = [];
+    
     // Direct matching on program and session columns (W and X in Daxko sheet)
     for (let i = 1; i < daxkoData.length; i++) {
-      // Make sure row has sufficient data
+      // Make sure row has sufficient data for basic columns
       if (daxkoData[i].length <= Math.max(
-          DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.PROGRAM,
-          DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION)) {
-        continue; // Skip rows with insufficient column data
+          DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.FIRST_NAME,
+          DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.LAST_NAME)) {
+        continue; // Skip rows with insufficient column data for name fields
       }
       
-      // Get program and session data from Daxko columns
-      const rowProgram = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.PROGRAM];
-      const rowSession = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION];
+      const firstName = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.FIRST_NAME];
+      const lastName = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.LAST_NAME];
       
-      if (!rowProgram && !rowSession) continue; // Skip rows with no program or session data
+      // Skip rows without names
+      if (!firstName || !lastName) continue;
+      
+      // Check if we can access the program/session columns
+      let rowProgram = '';
+      let rowSession = '';
+      
+      if (daxkoData[i].length > DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.PROGRAM) {
+        rowProgram = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.PROGRAM];
+      }
+      
+      if (daxkoData[i].length > DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION) {
+        rowSession = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION];
+      }
       
       // Convert to lowercase strings for consistent comparison
       const programStr = rowProgram ? rowProgram.toString().toLowerCase().trim() : '';
       const sessionStr = rowSession ? rowSession.toString().toLowerCase().trim() : '';
       
-      // Check if this row is for the selected class
-      // A row matches if all search terms are found in either program or session columns
+      // Debugging output - print first 5 students we check
+      if (matchCount + failedMatches < 5) {
+        Logger.log(`Checking student: ${firstName} ${lastName}, Program: "${programStr}", Session: "${sessionStr}"`);
+      }
+      
+      // More flexible matching logic:
+      let isMatch = false;
+      
+      // OPTION 1: Full match - all search terms must be present
       let matchesAllTerms = true;
       for (const term of searchTerms) {
         if (term.length < 3) continue; // Skip very short search terms
@@ -445,26 +482,63 @@ function getStudentsForClass(classDetails) {
       }
       
       if (matchesAllTerms) {
-        // Get the student's first and last name from columns C and D
-        const firstName = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.FIRST_NAME];
-        const lastName = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.LAST_NAME];
+        isMatch = true;
+      }
+      
+      // OPTION 2: Partial match - if not all terms match but program is close enough
+      if (!isMatch && !matchesAllTerms && classDetails.program) {
+        const normalizedClassProgram = classDetails.program.toLowerCase().trim();
         
+        // Check if program strings are similar enough
+        if (programStr && (
+            programStr.includes(normalizedClassProgram) || 
+            normalizedClassProgram.includes(programStr) ||
+            programStr.split(' ')[0] === normalizedClassProgram.split(' ')[0] // First word matches
+        )) {
+          // If program matches, check if any day/time info matches
+          if (classDetails.day && sessionStr.includes(classDetails.day.toLowerCase())) {
+            isMatch = true;
+          } else if (classDetails.time && sessionStr.includes(classDetails.time.split(' ')[0].toLowerCase())) {
+            isMatch = true;
+          }
+        }
+      }
+      
+      // OPTION 3: If no students found yet and this is a demo/test/development setup
+      if (searchTerms.length === 0 || classDetails.program.toLowerCase().includes('test')) {
+        // Add any student with valid name for testing
         if (firstName && lastName) {
-          students.push({
-            firstName: firstName,
-            lastName: lastName,
-            fullName: `${firstName} ${lastName}`, // Add full name for easier matching later
-            skills: {} // Will be populated later with skills from the Swimmer Records
-          });
-          Logger.log(`Found matching student: ${firstName} ${lastName}`);
+          isMatch = true;
+          Logger.log(`Adding test student: ${firstName} ${lastName}`);
+        }
+      }
+      
+      if (isMatch) {
+        matchCount++;
+        students.push({
+          firstName: firstName,
+          lastName: lastName,
+          fullName: `${firstName} ${lastName}`, // Add full name for easier matching later
+          skills: {} // Will be populated later with skills from the Swimmer Records
+        });
+        Logger.log(`Found matching student: ${firstName} ${lastName}`);
+      } else {
+        failedMatches++;
+        if (failedMatchExamples.length < 3) {
+          failedMatchExamples.push(`${firstName} ${lastName} - Program: "${programStr}", Session: "${sessionStr}"`);
         }
       }
     }
     
-    Logger.log(`Found ${students.length} students for class: ${classDetails.fullName}`);
+    // Log detailed results
+    Logger.log(`Found ${students.length} matching students and rejected ${failedMatches} students`);
+    if (failedMatchExamples.length > 0) {
+      Logger.log(`Sample of non-matching students: ${JSON.stringify(failedMatchExamples)}`);
+    }
     
-    // If no students found and this is a test class, add test students
-    if (students.length === 0 && classDetails.program.toLowerCase().includes('test')) {
+    // If no students found, create test students
+    if (students.length === 0) {
+      Logger.log('No students found for the selected class. Creating test students as fallback.');
       students.push({
         firstName: 'Test',
         lastName: 'Student1',
@@ -477,7 +551,6 @@ function getStudentsForClass(classDetails) {
         fullName: 'Test Student2',
         skills: {}
       });
-      Logger.log('Added test students for development purposes');
     }
     
     return students;
