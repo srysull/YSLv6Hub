@@ -13,6 +13,7 @@
 // Configuration constants
 const DYNAMIC_INSTRUCTOR_CONFIG = {
   SHEET_NAME: 'Instructor Sheet',
+  ROSTER_SHEET_NAME: 'Daxko', // Changed from 'Roster' to 'Daxko'
   HEADERS: {
     CLASS_SELECTOR_LABEL: 'Select Class:',
     FIRST_NAME: 'First Name',
@@ -361,10 +362,10 @@ function parseClassDetails(selectedClass) {
 function getStudentsForClass(classDetails) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const rosterSheet = ss.getSheetByName('Roster');
+    const rosterSheet = ss.getSheetByName(DYNAMIC_INSTRUCTOR_CONFIG.ROSTER_SHEET_NAME);
     
     if (!rosterSheet) {
-      throw new Error('Roster sheet not found');
+      throw new Error(`${DYNAMIC_INSTRUCTOR_CONFIG.ROSTER_SHEET_NAME} sheet not found. Please make sure the Daxko sheet exists.`);
     }
     
     // Get all roster data
@@ -378,12 +379,24 @@ function getStudentsForClass(classDetails) {
       
       // Check if this row matches the class
       if (rowProgram && rowProgram.includes(classDetails.program)) {
-        students.push({
-          firstName: rosterData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.FIRST_NAME],
-          lastName: rosterData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.LAST_NAME],
-          skills: {} // Will be populated later with skills from the Swimmer Records
-        });
+        // Make sure we have valid first and last names
+        const firstName = rosterData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.FIRST_NAME];
+        const lastName = rosterData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.LAST_NAME];
+        
+        if (firstName && lastName) {
+          students.push({
+            firstName: firstName,
+            lastName: lastName,
+            skills: {} // Will be populated later with skills from the Swimmer Records
+          });
+        }
       }
+    }
+    
+    if (students.length === 0) {
+      Logger.log(`No students found matching program: ${classDetails.program}`);
+    } else {
+      Logger.log(`Found ${students.length} students for program: ${classDetails.program}`);
     }
     
     return students;
