@@ -276,7 +276,8 @@ function getAvailableClasses() {
           // Check if this is a private lesson
           const programStr = program.toString().toLowerCase();
           if (programStr.includes('private')) {
-            // Format as "[Program] [Day]" for private lessons
+            // Format as "[Program] [Day]" only for private lessons
+            // Don't include the session time in the selector
             const privateLessonName = day ? `${program} ${day}` : program;
             privateLessons.add(privateLessonName);
           }
@@ -353,14 +354,20 @@ function onEditDynamicInstructorSheet(e) {
     
     // Check if the edit was in the class selector (C1:D1)
     if (e.range.getRow() === 1 && (e.range.getColumn() === 3 || e.range.getColumn() === 4)) {
-      const selectedClass = e.value;
+      // Get the value directly from the cell since e.value might not be reliable for merged cells
+      const selectedClass = e.range.getSheet().getRange('C1:D1').getValue();
       
       if (!selectedClass) {
         return; // No class selected
       }
       
+      Logger.log(`Class selected from dropdown: ${selectedClass}`);
+      
       // Populate the sheet with the selected class's data
       populateSheetWithClassData(e.range.getSheet(), selectedClass);
+      
+      // Ensure class selector dropdown remains after populating the sheet
+      createClassSelector(e.range.getSheet());
     }
   } catch (error) {
     Logger.log(`Error in onEditDynamicInstructorSheet: ${error.message}`);
@@ -1488,26 +1495,20 @@ function setupPrivateLessonLayout(sheet, classDetails) {
       .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
       .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
     
-    // Date column
-    sheet.getRange('C3').setValue('Lesson Date')
-      .setFontWeight('bold')
-      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
-      .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
-    
-    // Session column (time details)
-    sheet.getRange('D3').setValue('Session Time')
-      .setFontWeight('bold')
-      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
-      .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
-    
     // Instructor
-    sheet.getRange('E3').setValue('Instructor')
+    sheet.getRange('C3').setValue('Instructor')
+      .setFontWeight('bold')
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
+      .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
+    
+    // Session column (time details from Daxko column X)
+    sheet.getRange('D3').setValue('Session')
       .setFontWeight('bold')
       .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
       .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
     
     // Notes
-    sheet.getRange('F3').setValue('Notes')
+    sheet.getRange('E3').setValue('Notes')
       .setFontWeight('bold')
       .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
       .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
@@ -1515,14 +1516,13 @@ function setupPrivateLessonLayout(sheet, classDetails) {
     // Set column widths
     sheet.setColumnWidth(1, 150); // First Name
     sheet.setColumnWidth(2, 150); // Last Name
-    sheet.setColumnWidth(3, 100); // Date
-    sheet.setColumnWidth(4, 120); // Session
-    sheet.setColumnWidth(5, 150); // Instructor
-    sheet.setColumnWidth(6, 300); // Notes
+    sheet.setColumnWidth(3, 150); // Instructor
+    sheet.setColumnWidth(4, 200); // Session
+    sheet.setColumnWidth(5, 300); // Notes
     
     // Hide unused columns
-    if (sheet.getMaxColumns() > 7) {
-      sheet.hideColumns(7, sheet.getMaxColumns() - 6);
+    if (sheet.getMaxColumns() > 6) {
+      sheet.hideColumns(6, sheet.getMaxColumns() - 5);
     }
     
     // Freeze the header rows
@@ -1532,7 +1532,7 @@ function setupPrivateLessonLayout(sheet, classDetails) {
     const actualRowsNeeded = Math.max(5, studentsWithDates.length);
     
     // Format all data columns to be centered
-    const dataRowsRange = sheet.getRange(4, 1, actualRowsNeeded, 6);
+    const dataRowsRange = sheet.getRange(4, 1, actualRowsNeeded, 5);
     dataRowsRange.setHorizontalAlignment('center');
     dataRowsRange.setVerticalAlignment('middle');
     
@@ -1543,8 +1543,8 @@ function setupPrivateLessonLayout(sheet, classDetails) {
         const rowIndex = i + 4; // Start after header rows
         sheet.getRange(rowIndex, 1).setValue('');
         sheet.getRange(rowIndex, 2).setValue('');
-        sheet.getRange(rowIndex, 3).setValue('');
-        sheet.getRange(rowIndex, 4).setValue('');
+        sheet.getRange(rowIndex, 3).setValue(''); // Instructor
+        sheet.getRange(rowIndex, 4).setValue(''); // Session
       }
     } else {
       // Add existing students with dates and empty rows
@@ -1552,10 +1552,12 @@ function setupPrivateLessonLayout(sheet, classDetails) {
         const rowIndex = i + 4; // Start after header rows
         
         if (i < studentsWithDates.length) {
-          // Add student name, date and session info
+          // Add student name and session info (from Daxko column X)
           sheet.getRange(rowIndex, 1).setValue(studentsWithDates[i].firstName);
           sheet.getRange(rowIndex, 2).setValue(studentsWithDates[i].lastName);
-          sheet.getRange(rowIndex, 3).setValue(studentsWithDates[i].date);
+          // Leave instructor column blank for instructor input
+          sheet.getRange(rowIndex, 3).setValue('');
+          // Put session information in column 4
           sheet.getRange(rowIndex, 4).setValue(studentsWithDates[i].session || '');
         } else {
           // Add empty row for manual entry
@@ -1570,7 +1572,7 @@ function setupPrivateLessonLayout(sheet, classDetails) {
     // Add alternating row colors for better readability
     for (let i = 0; i < actualRowsNeeded; i++) {
       if (i % 2 === 1) { // Odd rows (0-based index, so rows 5, 7, 9, etc.)
-        sheet.getRange(i + 4, 1, 1, 6).setBackground('#f3f3f3'); // Light gray
+        sheet.getRange(i + 4, 1, 1, 5).setBackground('#f3f3f3'); // Light gray
       }
     }
     
