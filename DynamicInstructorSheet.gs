@@ -273,6 +273,13 @@ function populateSheetWithClassData(sheet, selectedClass) {
     // Get class details from the selected class
     const classDetails = parseClassDetails(selectedClass);
     
+    // Check if this is a private lesson
+    if (classDetails.isPrivateLesson) {
+      // Use special layout for private lessons
+      setupPrivateLessonLayout(sheet, classDetails);
+      return; // Exit early, no need to proceed with regular class setup
+    }
+    
     // Extract stage from class name if possible (e.g., "S1" from "Swimming S1 Monday")
     const stage = extractStageFromClassName(classDetails.program);
     Logger.log(`Extracted stage: ${stage} from class: ${classDetails.program}`);
@@ -339,6 +346,9 @@ function parseClassDetails(selectedClass) {
     // Parse out program, day, and time
     const parts = selectedClass.split(' ');
     
+    // Check if this is a private lesson
+    const isPrivateLesson = selectedClass.toLowerCase().includes('private');
+    
     // The program may have multiple words, so we need to find where the day starts
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     let dayIndex = -1;
@@ -356,7 +366,8 @@ function parseClassDetails(selectedClass) {
         fullName: selectedClass,
         program: selectedClass,
         day: '',
-        time: ''
+        time: '',
+        isPrivateLesson: isPrivateLesson
       };
     }
     
@@ -368,7 +379,8 @@ function parseClassDetails(selectedClass) {
       fullName: selectedClass,
       program: program,
       day: day,
-      time: time
+      time: time,
+      isPrivateLesson: isPrivateLesson
     };
   } catch (error) {
     Logger.log(`Error parsing class details: ${error.message}`);
@@ -376,7 +388,8 @@ function parseClassDetails(selectedClass) {
       fullName: selectedClass,
       program: selectedClass,
       day: '',
-      time: ''
+      time: '',
+      isPrivateLesson: false
     };
   }
 }
@@ -1229,8 +1242,88 @@ function addSkillValidation(sheet, startRow, studentCount, skills) {
 
 // Function removed as per requirement to eliminate pushing data back to Swimmer Records
 
+/**
+ * Sets up a simplified layout for private lessons
+ * @param {Sheet} sheet - The instructor sheet
+ * @param {Object} classDetails - The private lesson details
+ */
+function setupPrivateLessonLayout(sheet, classDetails) {
+  try {
+    // Add class header with private lesson info
+    sheet.getRange('A2:Z2').merge()
+      .setValue(`Private Lesson: ${classDetails.fullName}`)
+      .setFontWeight('bold')
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SECTION_COLOR)
+      .setHorizontalAlignment('center');
+    
+    // Set up simplified headers for private lessons
+    // First name
+    sheet.getRange('A3').setValue(DYNAMIC_INSTRUCTOR_CONFIG.HEADERS.FIRST_NAME)
+      .setFontWeight('bold')
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
+      .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
+    
+    // Last name
+    sheet.getRange('B3').setValue(DYNAMIC_INSTRUCTOR_CONFIG.HEADERS.LAST_NAME)
+      .setFontWeight('bold')
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
+      .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
+    
+    // Instructor
+    sheet.getRange('C3').setValue('Instructor')
+      .setFontWeight('bold')
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
+      .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
+    
+    // Notes
+    sheet.getRange('D3').setValue('Notes')
+      .setFontWeight('bold')
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
+      .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
+    
+    // Set column widths
+    sheet.setColumnWidth(1, 150); // First Name
+    sheet.setColumnWidth(2, 150); // Last Name
+    sheet.setColumnWidth(3, 150); // Instructor
+    sheet.setColumnWidth(4, 300); // Notes
+    
+    // Freeze the header rows
+    sheet.setFrozenRows(3);
+    
+    // Get student roster for this private lesson
+    const students = getStudentsForClass(classDetails);
+    
+    // Display info message if no students, but continue with empty roster
+    if (students.length === 0) {
+      sheet.getRange('A4').setValue('No students found for this private lesson. Add students manually or check class details.');
+    } else {
+      // Add student data
+      for (let i = 0; i < students.length; i++) {
+        const rowIndex = i + 4; // Start after header rows
+        
+        // Add student name
+        sheet.getRange(rowIndex, 1).setValue(students[i].firstName);
+        sheet.getRange(rowIndex, 2).setValue(students[i].lastName);
+      }
+    }
+    
+    // Add a default blank row if no students were found
+    if (students.length === 0) {
+      sheet.getRange('A4').setValue('');
+      sheet.getRange('B4').setValue('');
+    }
+    
+    Logger.log('Private lesson layout successfully created');
+  } catch (error) {
+    Logger.log(`Error setting up private lesson layout: ${error.message}`);
+    sheet.getRange('A4').setValue(`Error creating private lesson layout: ${error.message}`);
+    throw error;
+  }
+}
+
 // Make functions available to other modules
 const DynamicInstructorSheet = {
   createDynamicInstructorSheet: createDynamicInstructorSheet,
-  onEditDynamicInstructorSheet: onEditDynamicInstructorSheet
+  onEditDynamicInstructorSheet: onEditDynamicInstructorSheet,
+  setupPrivateLessonLayout: setupPrivateLessonLayout
 };
