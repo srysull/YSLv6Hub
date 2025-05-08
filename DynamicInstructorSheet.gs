@@ -267,6 +267,10 @@ function onEditDynamicInstructorSheet(e) {
  */
 function populateSheetWithClassData(sheet, selectedClass) {
   try {
+    // First clear any existing data validation to avoid errors
+    const fullSheetRange = sheet.getDataRange();
+    fullSheetRange.clearDataValidations();
+    
     // Clear existing student data
     clearStudentData(sheet);
     
@@ -279,6 +283,8 @@ function populateSheetWithClassData(sheet, selectedClass) {
       setupPrivateLessonLayout(sheet, classDetails);
       return; // Exit early, no need to proceed with regular class setup
     }
+    
+    // For regular classes, continue with the standard layout
     
     // Extract stage from class name if possible (e.g., "S1" from "Swimming S1 Monday")
     const stage = extractStageFromClassName(classDetails.program);
@@ -294,27 +300,48 @@ function populateSheetWithClassData(sheet, selectedClass) {
     // Add attendance columns
     setupAttendanceColumns(sheet);
     
-    // Get skills from swimmer records
-    const allSkills = getSkillsFromSwimmerRecords();
-    
-    // Filter skills by stage if possible
-    const filteredSkills = filterSkillsByStage(allSkills, stage);
-    
-    // Add skills columns with split for before/after tracking
-    setupSplitSkillsColumns(sheet, filteredSkills);
-    
-    // Get student roster for this class
-    const students = getStudentsForClass(classDetails);
-    
-    // Display info message if no students, but continue with empty roster
-    if (students.length === 0) {
-      // This will be overwritten if test students get added
-      sheet.getRange('A4').setValue('No students found in Daxko for this class. Add students manually or check class details.');
+    try {
+      // Get skills from swimmer records (wrap in try-catch to handle errors gracefully)
+      const allSkills = getSkillsFromSwimmerRecords();
+      
+      // Filter skills by stage if possible
+      const filteredSkills = filterSkillsByStage(allSkills, stage);
+      
+      // Add skills columns with split for before/after tracking
+      setupSplitSkillsColumns(sheet, filteredSkills);
+      
+      // Get student roster for this class
+      const students = getStudentsForClass(classDetails);
+      
+      // Display info message if no students, but continue with empty roster
+      if (students.length === 0) {
+        // This will be overwritten if test students get added
+        sheet.getRange('A4').setValue('No students found in Daxko for this class. Add students manually or check class details.');
+      }
+      
+      // Populate student data (even if it's just test/demo students)
+      populateStudentData(sheet, students, filteredSkills);
+    } catch (skillError) {
+      // Handle errors with skills or swimmer records gracefully
+      Logger.log(`Error loading skills data: ${skillError.message}`);
+      
+      // Set up a simplified version without skills
+      sheet.getRange('A4').setValue(`Note: Skills data couldn't be loaded. Using simplified layout.`);
+      
+      // Still get the student roster
+      const students = getStudentsForClass(classDetails);
+      
+      // Add student names in a simplified format
+      if (students.length > 0) {
+        for (let i = 0; i < students.length; i++) {
+          const rowIndex = i + 5; // Start after the note
+          sheet.getRange(rowIndex, 1).setValue(students[i].firstName);
+          sheet.getRange(rowIndex, 2).setValue(students[i].lastName);
+        }
+      } else {
+        sheet.getRange('A5').setValue('No students found. Add students manually or check class details.');
+      }
     }
-    
-    // Populate student data (even if it's just test/demo students)
-    populateStudentData(sheet, students, filteredSkills);
-    
   } catch (error) {
     Logger.log(`Error populating sheet with class data: ${error.message}`);
     sheet.getRange('A4').setValue(`Error loading class data: ${error.message}`);
@@ -1206,37 +1233,49 @@ function extractStageFromSkillHeader(header) {
 function addSkillValidation(sheet, startRow, studentCount, skills) {
   if (studentCount <= 0) return;
   
-  // Skill validation options
-  const skillOptions = ['', 'X', '/', '?', 'N/A'];
-  
-  // Create a data validation rule
-  const rule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(skillOptions, true)
-    .setAllowInvalid(false)
-    .build();
-  
-  // Calculate start and end columns for skills
-  const skillsStartCol = 3 + DYNAMIC_INSTRUCTOR_CONFIG.HEADERS.ATTENDANCE_COUNT;
-  const totalSkillsColumns = (skills.stage.length * 2) + (skills.saw.length * 2);
-  
-  // Apply validation to all skill cells
-  if (totalSkillsColumns > 0) {
-    const validationRange = sheet.getRange(
-      startRow, 
-      skillsStartCol, 
-      studentCount, 
-      totalSkillsColumns
-    );
+  try {
+    // Check if this is a private lesson sheet by looking for 'Private Lesson:' in cell A2
+    const headerText = sheet.getRange('A2').getValue().toString();
+    if (headerText.indexOf('Private Lesson:') >= 0) {
+      // Don't add validation for private lessons
+      return;
+    }
     
-    validationRange.setDataValidation(rule);
+    // Skill validation options
+    const skillOptions = ['', 'X', '/', '?', 'N/A'];
     
-    // Add note explaining values
-    validationRange.setNote(
-      'X = Achieved\n' +
-      '/ = In Progress\n' +
-      '? = Not Yet Assessed\n' +
-      'N/A = Not Applicable'
-    );
+    // Create a data validation rule
+    const rule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(skillOptions, true)
+      .setAllowInvalid(true) // Changed to true to avoid errors if invalid data entered
+      .build();
+    
+    // Calculate start and end columns for skills
+    const skillsStartCol = 3 + DYNAMIC_INSTRUCTOR_CONFIG.HEADERS.ATTENDANCE_COUNT;
+    const totalSkillsColumns = (skills.stage.length * 2) + (skills.saw.length * 2);
+    
+    // Apply validation to all skill cells
+    if (totalSkillsColumns > 0) {
+      const validationRange = sheet.getRange(
+        startRow, 
+        skillsStartCol, 
+        studentCount, 
+        totalSkillsColumns
+      );
+      
+      validationRange.setDataValidation(rule);
+      
+      // Add note explaining values to the first cell only to avoid cluttering the sheet
+      sheet.getRange(startRow, skillsStartCol).setNote(
+        'X = Achieved\n' +
+        '/ = In Progress\n' +
+        '? = Not Yet Assessed\n' +
+        'N/A = Not Applicable'
+      );
+    }
+  } catch (error) {
+    // Log the error but don't fail the whole function
+    Logger.log(`Error adding skill validation: ${error.message}`);
   }
 }
 
@@ -1249,6 +1288,13 @@ function addSkillValidation(sheet, startRow, studentCount, skills) {
  */
 function setupPrivateLessonLayout(sheet, classDetails) {
   try {
+    // First clear any existing data validation to avoid errors
+    const fullSheetRange = sheet.getDataRange();
+    fullSheetRange.clearDataValidations();
+    
+    // Clear existing content but keep the sheet
+    sheet.clear();
+    
     // Add class header with private lesson info
     sheet.getRange('A2:Z2').merge()
       .setValue(`Private Lesson: ${classDetails.fullName}`)
@@ -1293,24 +1339,44 @@ function setupPrivateLessonLayout(sheet, classDetails) {
     // Get student roster for this private lesson
     const students = getStudentsForClass(classDetails);
     
-    // Display info message if no students, but continue with empty roster
+    // Prepare for student data entry - add more rows if needed
+    const rowsToAdd = Math.max(10, students.length); // Ensure at least 10 rows for manual entry
+    
+    // Format instructor and notes columns to be centered
+    const dataRowsRange = sheet.getRange(4, 1, rowsToAdd, 4);
+    dataRowsRange.setHorizontalAlignment('center');
+    dataRowsRange.setVerticalAlignment('middle');
+    
+    // Add student data if available
     if (students.length === 0) {
-      sheet.getRange('A4').setValue('No students found for this private lesson. Add students manually or check class details.');
+      // Add empty rows for manual entry
+      for (let i = 0; i < rowsToAdd; i++) {
+        const rowIndex = i + 4; // Start after header rows
+        sheet.getRange(rowIndex, 1).setValue('');
+        sheet.getRange(rowIndex, 2).setValue('');
+      }
     } else {
-      // Add student data
-      for (let i = 0; i < students.length; i++) {
+      // Add existing students and empty rows
+      for (let i = 0; i < rowsToAdd; i++) {
         const rowIndex = i + 4; // Start after header rows
         
-        // Add student name
-        sheet.getRange(rowIndex, 1).setValue(students[i].firstName);
-        sheet.getRange(rowIndex, 2).setValue(students[i].lastName);
+        if (i < students.length) {
+          // Add student name
+          sheet.getRange(rowIndex, 1).setValue(students[i].firstName);
+          sheet.getRange(rowIndex, 2).setValue(students[i].lastName);
+        } else {
+          // Add empty row for manual entry
+          sheet.getRange(rowIndex, 1).setValue('');
+          sheet.getRange(rowIndex, 2).setValue('');
+        }
       }
     }
     
-    // Add a default blank row if no students were found
-    if (students.length === 0) {
-      sheet.getRange('A4').setValue('');
-      sheet.getRange('B4').setValue('');
+    // Add alternating row colors for better readability
+    for (let i = 0; i < rowsToAdd; i++) {
+      if (i % 2 === 1) { // Odd rows (0-based index, so rows 5, 7, 9, etc.)
+        sheet.getRange(i + 4, 1, 1, 4).setBackground('#f3f3f3'); // Light gray
+      }
     }
     
     Logger.log('Private lesson layout successfully created');
