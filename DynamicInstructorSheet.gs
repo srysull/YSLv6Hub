@@ -215,35 +215,87 @@ function getAvailableClasses() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const classesSheet = ss.getSheetByName('Classes');
     
-    if (!classesSheet) {
-      throw new Error('Classes sheet not found');
+    // Also try to get Daxko sheet to extract private lessons
+    const daxkoSheet = ss.getSheetByName(DYNAMIC_INSTRUCTOR_CONFIG.ROSTER_SHEET_NAME);
+    
+    if (!classesSheet && !daxkoSheet) {
+      throw new Error('No source sheets found for class data');
     }
     
-    // Get class data
-    const classData = classesSheet.getDataRange().getValues();
-    
-    // Display some information about the Classes sheet
-    Logger.log(`Classes sheet has ${classData.length} rows`);
-    if (classData.length > 0) {
-      Logger.log(`Classes sheet headers: ${JSON.stringify(classData[0])}`);
-    }
-    
-    // Skip header row
     const classNames = [];
-    for (let i = 1; i < classData.length; i++) {
-      // Check if row has valid data for the class definition
-      if (classData[i].length > 3 && classData[i][1] && classData[i][2] && classData[i][3]) {
-        const className = `${classData[i][1]} ${classData[i][2]} ${classData[i][3]}`;
-        classNames.push(className);
-        Logger.log(`Added class: ${className}`);
+    
+    // First get regular class data if available
+    if (classesSheet) {
+      const classData = classesSheet.getDataRange().getValues();
+      
+      // Display some information about the Classes sheet
+      Logger.log(`Classes sheet has ${classData.length} rows`);
+      if (classData.length > 0) {
+        Logger.log(`Classes sheet headers: ${JSON.stringify(classData[0])}`);
+      }
+      
+      // Skip header row
+      for (let i = 1; i < classData.length; i++) {
+        // Check if row has valid data for the class definition
+        if (classData[i].length > 3 && classData[i][1] && classData[i][2] && classData[i][3]) {
+          const className = `${classData[i][1]} ${classData[i][2]} ${classData[i][3]}`;
+          classNames.push(className);
+          Logger.log(`Added regular class: ${className}`);
+        }
+      }
+    }
+    
+    // Add private lessons from Daxko roster if available
+    if (daxkoSheet) {
+      const daxkoData = daxkoSheet.getDataRange().getValues();
+      
+      // Skip header row, process Daxko data
+      if (daxkoData.length > 1) {
+        const privateLessons = new Set(); // Use a Set to avoid duplicates
+        
+        for (let i = 1; i < daxkoData.length; i++) {
+          // Check for sufficient data in this row
+          if (daxkoData[i].length <= Math.max(
+              DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.PROGRAM,
+              DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION)) {
+            continue;
+          }
+          
+          const program = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.PROGRAM];
+          let day = '';
+          
+          // Try to extract day from column Z if available (column 25, 0-indexed)
+          const dayColumnIndex = 25; // Column Z (0-indexed)
+          if (daxkoData[i].length > dayColumnIndex) {
+            day = daxkoData[i][dayColumnIndex];
+          }
+          
+          // Skip rows without program information
+          if (!program) continue;
+          
+          // Check if this is a private lesson
+          const programStr = program.toString().toLowerCase();
+          if (programStr.includes('private')) {
+            // Format as "[Program] [Day]" for private lessons
+            const privateLessonName = day ? `${program} ${day}` : program;
+            privateLessons.add(privateLessonName);
+          }
+        }
+        
+        // Add private lessons to class names
+        privateLessons.forEach(lesson => {
+          classNames.push(lesson);
+          Logger.log(`Added private lesson: ${lesson}`);
+        });
       }
     }
     
     // If no classes found, add some test options
     if (classNames.length === 0) {
-      Logger.log('No classes found in the Classes sheet, adding test classes');
+      Logger.log('No classes found, adding test classes');
       classNames.push('Test Swimming Monday 9:00 AM');
       classNames.push('Test Swimming Tuesday 10:00 AM');
+      classNames.push('Private Swim Lesson Monday');
     }
     
     return classNames;
@@ -251,7 +303,11 @@ function getAvailableClasses() {
     Logger.log(`Error getting available classes: ${error.message}`);
     
     // Return some test classes as a fallback
-    return ['Test Swimming Monday 9:00 AM', 'Test Swimming Tuesday 10:00 AM'];
+    return [
+      'Test Swimming Monday 9:00 AM', 
+      'Test Swimming Tuesday 10:00 AM',
+      'Private Swim Lesson Monday'
+    ];
   }
 }
 
@@ -339,12 +395,13 @@ function populateSheetWithClassData(sheet, selectedClass) {
     // For regular classes, continue with the standard layout
     
     // Extract stage from class name if possible (e.g., "S1" from "Swimming S1 Monday")
-    const stage = extractStageFromClassName(classDetails.program);
-    Logger.log(`Extracted stage: ${stage} from class: ${classDetails.program}`);
+    const stageInfo = extractStageFromClassName(classDetails.program);
+    const stageDisplay = stageInfo.value ? `${stageInfo.prefix}${stageInfo.value.toUpperCase()}` : '';
+    Logger.log(`Extracted stage: ${stageDisplay} from class: ${classDetails.program}`);
     
     // Add class header with stage info
     sheet.getRange('A2:Z2').merge()
-      .setValue(`Class: ${selectedClass}${stage ? ` - Stage ${stage}` : ''}`)
+      .setValue(`Class: ${selectedClass}${stageDisplay ? ` - Stage ${stageDisplay}` : ''}`)
       .setFontWeight('bold')
       .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SECTION_COLOR)
       .setHorizontalAlignment('center');
@@ -357,7 +414,7 @@ function populateSheetWithClassData(sheet, selectedClass) {
       const allSkills = getSkillsFromSwimmerRecords();
       
       // Filter skills by stage if possible
-      const filteredSkills = filterSkillsByStage(allSkills, stage);
+      const filteredSkills = filterSkillsByStage(allSkills, stageInfo);
       
       // Add skills columns with split for before/after tracking
       setupSplitSkillsColumns(sheet, filteredSkills);
@@ -1179,55 +1236,71 @@ function getStudentSkillsFromSwimmerRecords(students) {
 }
 
 /**
- * Extracts the stage number from a class name
+ * Extracts the stage from a class name
  * @param {string} className - The class name to extract from
- * @return {string} The extracted stage number or empty string if not found
+ * @return {Object} Contains stage value and prefix (e.g. {value: '1', prefix: 'S'})
  */
 function extractStageFromClassName(className) {
-  if (!className) return '';
+  if (!className) return { value: '', prefix: '' };
   
   // Convert to string and lowercase for consistent processing
   const normalizedName = className.toString().toLowerCase().trim();
   
-  // Pattern 1: Look for "Stage X" in the name
-  let stageMatch = normalizedName.match(/stage\s*([1-6])/i);
+  // Pattern 1: Look for "Stage X" in the name (X can be digit or letter)
+  let stageMatch = normalizedName.match(/stage\s*([1-6a-f])/i);
   if (stageMatch && stageMatch[1]) {
-    return stageMatch[1];
+    // Determine if it's a numeric or letter stage
+    const stageValue = stageMatch[1];
+    return { 
+      value: stageValue,
+      prefix: 'S'  // Default prefix for all stages
+    };
   }
   
-  // Pattern 2: Look for "SX" format (e.g., S1, S2, etc.)
-  stageMatch = normalizedName.match(/\bs([1-6])\b/i);
+  // Pattern 2: Look for "SX" format (e.g., S1, S2, SA, etc.)
+  stageMatch = normalizedName.match(/\bs([1-6a-f])\b/i);
   if (stageMatch && stageMatch[1]) {
-    return stageMatch[1];
+    return { 
+      value: stageMatch[1],
+      prefix: 'S'
+    };
   }
   
-  // Pattern 3: Look for "X" where X is a digit 1-6 that might be stage
+  // Pattern 3: Look for "X" where X is a digit 1-6 or letter A-F that might be stage
   // Only use this if it's likely to be referring to a stage
   if (normalizedName.includes('swim') || 
       normalizedName.includes('aqua') || 
       normalizedName.includes('water')) {
-    stageMatch = normalizedName.match(/\b([1-6])\b/);
+    stageMatch = normalizedName.match(/\b([1-6a-f])\b/i);
     if (stageMatch && stageMatch[1]) {
-      return stageMatch[1];
+      return { 
+        value: stageMatch[1],
+        prefix: 'S'
+      };
     }
   }
   
-  return '';
+  // For backward compatibility, return an empty string when no stage is found
+  return { value: '', prefix: '' };
 }
 
 /**
  * Filters skills by stage based on the class name
  * @param {Object} allSkills - The complete skills object 
- * @param {string} stage - Stage number to filter by
+ * @param {Object} stageInfo - Stage info with value and prefix
  * @return {Object} Filtered skills object
  */
-function filterSkillsByStage(allSkills, stage) {
+function filterSkillsByStage(allSkills, stageInfo) {
   // If no stage specified or no skills available, return all skills
-  if (!stage || !allSkills) {
+  if (!stageInfo || !stageInfo.value || !allSkills) {
     return allSkills;
   }
   
-  Logger.log(`Filtering skills for stage ${stage}`);
+  const stageValue = stageInfo.value.toString().toLowerCase();
+  const stagePrefix = stageInfo.prefix || 'S';
+  const stageCode = `${stagePrefix}${stageValue}`;
+  
+  Logger.log(`Filtering skills for stage ${stageCode}`);
   
   const result = {
     stage: [],
@@ -1237,12 +1310,23 @@ function filterSkillsByStage(allSkills, stage) {
   // Only include skills for the specified stage and prior stages
   if (allSkills.stage && allSkills.stage.length > 0) {
     for (const skill of allSkills.stage) {
-      // Extract the stage number from the skill header (e.g., 'S1 Float' → '1')
-      const skillStage = skill.stage || extractStageFromSkillHeader(skill.header);
+      // Extract the stage from the skill header (e.g., 'S1 Float' → 'S1')
+      const skillStageInfo = extractStageFromSkillHeader(skill.header);
       
-      // Include skills from current stage and optionally the previous stage
-      if (skillStage === stage || skillStage === String(parseInt(stage) - 1)) {
-        result.stage.push(skill);
+      // For numeric stages, include current stage and previous stage
+      if (/^[0-9]+$/.test(stageValue)) {
+        const prevStage = String(parseInt(stageValue) - 1);
+        
+        if (skillStageInfo === stageCode || 
+            skillStageInfo === `${stagePrefix}${prevStage}`) {
+          result.stage.push(skill);
+        }
+      } 
+      // For letter stages (like 'A'), only include exact matches
+      else {
+        if (skillStageInfo === stageCode) {
+          result.stage.push(skill);
+        }
       }
     }
   }
@@ -1259,17 +1343,17 @@ function filterSkillsByStage(allSkills, stage) {
 }
 
 /**
- * Extracts stage number from a skill header
+ * Extracts stage code from a skill header
  * @param {string} header - The skill header
- * @return {string} The stage number or empty string
+ * @return {string} The complete stage code (e.g., 'S1', 'SA') or empty string
  */
 function extractStageFromSkillHeader(header) {
   if (!header) return '';
   
-  // Check for common patterns like 'S1' at the beginning
-  const match = header.toString().match(/^S([1-6])\s/);
+  // Check for common patterns like 'S1' or 'SA' at the beginning
+  const match = header.toString().match(/^(S[1-6A-Fa-f])\s/);
   if (match && match[1]) {
-    return match[1];
+    return match[1].toUpperCase();
   }
   
   return '';
@@ -1410,14 +1494,20 @@ function setupPrivateLessonLayout(sheet, classDetails) {
       .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
       .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
     
+    // Session column (time details)
+    sheet.getRange('D3').setValue('Session Time')
+      .setFontWeight('bold')
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
+      .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
+    
     // Instructor
-    sheet.getRange('D3').setValue('Instructor')
+    sheet.getRange('E3').setValue('Instructor')
       .setFontWeight('bold')
       .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
       .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
     
     // Notes
-    sheet.getRange('E3').setValue('Notes')
+    sheet.getRange('F3').setValue('Notes')
       .setFontWeight('bold')
       .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
       .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
@@ -1425,13 +1515,14 @@ function setupPrivateLessonLayout(sheet, classDetails) {
     // Set column widths
     sheet.setColumnWidth(1, 150); // First Name
     sheet.setColumnWidth(2, 150); // Last Name
-    sheet.setColumnWidth(3, 120); // Date
-    sheet.setColumnWidth(4, 150); // Instructor
-    sheet.setColumnWidth(5, 300); // Notes
+    sheet.setColumnWidth(3, 100); // Date
+    sheet.setColumnWidth(4, 120); // Session
+    sheet.setColumnWidth(5, 150); // Instructor
+    sheet.setColumnWidth(6, 300); // Notes
     
     // Hide unused columns
-    if (sheet.getMaxColumns() > 6) {
-      sheet.hideColumns(6, sheet.getMaxColumns() - 5);
+    if (sheet.getMaxColumns() > 7) {
+      sheet.hideColumns(7, sheet.getMaxColumns() - 6);
     }
     
     // Freeze the header rows
@@ -1441,7 +1532,7 @@ function setupPrivateLessonLayout(sheet, classDetails) {
     const actualRowsNeeded = Math.max(5, studentsWithDates.length);
     
     // Format all data columns to be centered
-    const dataRowsRange = sheet.getRange(4, 1, actualRowsNeeded, 5);
+    const dataRowsRange = sheet.getRange(4, 1, actualRowsNeeded, 6);
     dataRowsRange.setHorizontalAlignment('center');
     dataRowsRange.setVerticalAlignment('middle');
     
@@ -1453,6 +1544,7 @@ function setupPrivateLessonLayout(sheet, classDetails) {
         sheet.getRange(rowIndex, 1).setValue('');
         sheet.getRange(rowIndex, 2).setValue('');
         sheet.getRange(rowIndex, 3).setValue('');
+        sheet.getRange(rowIndex, 4).setValue('');
       }
     } else {
       // Add existing students with dates and empty rows
@@ -1460,15 +1552,17 @@ function setupPrivateLessonLayout(sheet, classDetails) {
         const rowIndex = i + 4; // Start after header rows
         
         if (i < studentsWithDates.length) {
-          // Add student name and date
+          // Add student name, date and session info
           sheet.getRange(rowIndex, 1).setValue(studentsWithDates[i].firstName);
           sheet.getRange(rowIndex, 2).setValue(studentsWithDates[i].lastName);
           sheet.getRange(rowIndex, 3).setValue(studentsWithDates[i].date);
+          sheet.getRange(rowIndex, 4).setValue(studentsWithDates[i].session || '');
         } else {
           // Add empty row for manual entry
           sheet.getRange(rowIndex, 1).setValue('');
           sheet.getRange(rowIndex, 2).setValue('');
           sheet.getRange(rowIndex, 3).setValue('');
+          sheet.getRange(rowIndex, 4).setValue('');
         }
       }
     }
@@ -1476,7 +1570,7 @@ function setupPrivateLessonLayout(sheet, classDetails) {
     // Add alternating row colors for better readability
     for (let i = 0; i < actualRowsNeeded; i++) {
       if (i % 2 === 1) { // Odd rows (0-based index, so rows 5, 7, 9, etc.)
-        sheet.getRange(i + 4, 1, 1, 5).setBackground('#f3f3f3'); // Light gray
+        sheet.getRange(i + 4, 1, 1, 6).setBackground('#f3f3f3'); // Light gray
       }
     }
     
@@ -1553,10 +1647,20 @@ function getPrivateLessonStudentsWithDates(classDetails) {
           }
         }
         
+        // Also get the session information (time details) from column X
+        let sessionInfo = '';
+        if (daxkoData[i].length > DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION) {
+          sessionInfo = daxkoData[i][DYNAMIC_INSTRUCTOR_CONFIG.DAXKO_COLUMNS.SESSION];
+          if (sessionInfo) {
+            sessionInfo = sessionInfo.toString().trim();
+          }
+        }
+        
         studentsWithDates.push({
           firstName: firstName,
           lastName: lastName,
           date: formattedDate,
+          session: sessionInfo, // Add the session info
           // Store the original date for sorting
           rawDate: rowDate instanceof Date ? rowDate : null
         });
