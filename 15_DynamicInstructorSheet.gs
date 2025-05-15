@@ -834,97 +834,197 @@ function setupAttendanceColumns(sheet) {
  */
 function getSkillsFromSwimmerRecords() {
   try {
-    // Get Swimmer Records URL from properties
-    let swimmerRecordsUrl;
+    // Get Swimmer Records URL from different possible sources with robust error handling
+    let swimmerRecordsUrl = null;
+    
+    // Try different ways to get the URL
     try {
-      swimmerRecordsUrl = GlobalFunctions.safeGetProperty(CONFIG.SWIMMER_RECORDS_URL);
+      // First, try GlobalFunctions if available
+      if (typeof GlobalFunctions !== 'undefined' && typeof GlobalFunctions.safeGetProperty === 'function') {
+        swimmerRecordsUrl = GlobalFunctions.safeGetProperty('swimmerRecordsUrl');
+        
+        // If not found with direct property name, try through CONFIG object
+        if (!swimmerRecordsUrl && typeof CONFIG !== 'undefined' && CONFIG.SWIMMER_RECORDS_URL) {
+          swimmerRecordsUrl = GlobalFunctions.safeGetProperty(CONFIG.SWIMMER_RECORDS_URL);
+        }
+      }
+      
+      // If still not found, try getting from AdministrativeModule
+      if (!swimmerRecordsUrl && typeof AdministrativeModule !== 'undefined' && 
+          typeof AdministrativeModule.getSystemConfiguration === 'function') {
+        const config = AdministrativeModule.getSystemConfiguration();
+        if (config && config.swimmerRecordsUrl) {
+          swimmerRecordsUrl = config.swimmerRecordsUrl;
+        }
+      }
+      
+      // Last resort - direct property access
+      if (!swimmerRecordsUrl) {
+        swimmerRecordsUrl = PropertiesService.getScriptProperties().getProperty('swimmerRecordsUrl');
+      }
     } catch (propError) {
-      Logger.log(`Error accessing CONFIG: ${propError.message}`);
-      return createFallbackSkills();
+      Logger.log(`Error accessing configuration: ${propError.message}`);
+      // Don't return yet, continue with hardcoded ID as last resort
     }
     
+    // If URL not found from any source, try a known hardcoded ID for testing
     if (!swimmerRecordsUrl) {
-      Logger.log('Swimmer Records URL not found in system configuration');
+      Logger.log('Swimmer Records URL not found in system configuration. Using fallback skills.');
       return createFallbackSkills();
     }
     
-    // Extract spreadsheet ID from URL
-    let ssId;
+    // Extract spreadsheet ID from URL with multiple fallback methods
+    let ssId = null;
+    
     try {
-      ssId = GlobalFunctions.extractIdFromUrl(swimmerRecordsUrl);
+      // Try with GlobalFunctions first
+      if (typeof GlobalFunctions !== 'undefined' && typeof GlobalFunctions.extractIdFromUrl === 'function') {
+        ssId = GlobalFunctions.extractIdFromUrl(swimmerRecordsUrl);
+      }
+      
+      // If that fails, try direct regex extraction
+      if (!ssId) {
+        const urlPattern = /[-\w]{25,}/;
+        const match = swimmerRecordsUrl.match(urlPattern);
+        ssId = match ? match[0] : null;
+      }
+      
+      // If that fails too, just use the URL as-is
+      if (!ssId) {
+        ssId = swimmerRecordsUrl;
+      }
     } catch (urlError) {
       Logger.log(`Error extracting ID from URL: ${urlError.message}`);
-      return createFallbackSkills();
+      // Try using URL directly
+      ssId = swimmerRecordsUrl;
     }
     
     if (!ssId) {
-      Logger.log('Invalid Swimmer Records URL');
+      Logger.log('Invalid Swimmer Records URL - could not extract valid ID');
       return createFallbackSkills();
     }
     
     // Log the spreadsheet ID we're trying to open
     Logger.log(`Attempting to open Swimmer Records with ID: ${ssId}`);
     
-    // Try to open the Swimmer Records Workbook
-    let swimmerSS;
     try {
-      swimmerSS = SpreadsheetApp.openById(ssId);
-    } catch (accessError) {
-      Logger.log(`Error accessing Swimmer Records: ${accessError.message}`);
-      return createFallbackSkills();
-    }
-    
-    // Get the first sheet
-    const sheets = swimmerSS.getSheets();
-    if (!sheets || sheets.length === 0) {
-      Logger.log('No sheets found in Swimmer Records Workbook');
-      return createFallbackSkills();
-    }
-    
-    const swimmerSheet = sheets[0]; // Assuming first sheet contains the records
-    
-    // Get the header row
-    const headerRow = swimmerSheet.getRange(1, 1, 1, swimmerSheet.getLastColumn()).getValues()[0];
-    
-    // Log the headers for debugging
-    Logger.log(`Swimmer Records headers: ${JSON.stringify(headerRow)}`);
-    
-    // Categorize skills
-    const skills = {
-      stage: [], // For stage skills (prefixed with S1, S2, etc.)
-      saw: []    // For SAW skills (prefixed with SAW)
-    };
-    
-    // Start from column 3 (after first and last name)
-    for (let i = 2; i < headerRow.length; i++) {
-      const header = headerRow[i];
-      if (!header) continue;
+      // Try to open the Swimmer Records Workbook with careful error handling
+      let swimmerSS = null;
       
-      // Check skill type by prefix
-      const headerStr = header.toString();
-      if (headerStr.startsWith('S') && !headerStr.startsWith('SAW')) {
-        skills.stage.push({
-          index: i,
-          header: headerStr
-        });
-      } else if (headerStr.startsWith('SAW')) {
-        skills.saw.push({
-          index: i,
-          header: headerStr
-        });
+      try {
+        // Try using GlobalFunctions for safer access if available
+        if (typeof GlobalFunctions !== 'undefined' && typeof GlobalFunctions.safeGetSpreadsheetById === 'function') {
+          swimmerSS = GlobalFunctions.safeGetSpreadsheetById(ssId);
+        } else {
+          // Direct access as fallback
+          swimmerSS = SpreadsheetApp.openById(ssId);
+        }
+      } catch (accessError) {
+        const errorMsg = `Error accessing Swimmer Records: ${accessError.message}`;
+        Logger.log(errorMsg);
+        
+        // Log with ErrorHandling if available
+        if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
+          ErrorHandling.logMessage(errorMsg, 'ERROR', 'getSkillsFromSwimmerRecords');
+        }
+        
+        // Fall back to test data
+        return createFallbackSkills();
       }
-    }
-    
-    // Log the skills we found
-    Logger.log(`Found ${skills.stage.length} stage skills and ${skills.saw.length} SAW skills`);
-    
-    // If no skills found, fall back to test skills
-    if (skills.stage.length === 0 && skills.saw.length === 0) {
-      Logger.log('No skills found in Swimmer Records, using fallback skills');
+      
+      if (!swimmerSS) {
+        Logger.log('Could not open Swimmer Records spreadsheet - null result');
+        return createFallbackSkills();
+      }
+      
+      // Find the right sheet - either Skills sheet or first sheet
+      let swimmerSheet = null;
+      try {
+        // Try to get Skills sheet first
+        swimmerSheet = swimmerSS.getSheetByName('Skills');
+        
+        // If not found, try first sheet
+        if (!swimmerSheet) {
+          const sheets = swimmerSS.getSheets();
+          if (sheets && sheets.length > 0) {
+            swimmerSheet = sheets[0];
+          }
+        }
+      } catch (sheetError) {
+        Logger.log(`Error finding appropriate sheet: ${sheetError.message}`);
+        return createFallbackSkills();
+      }
+      
+      if (!swimmerSheet) {
+        Logger.log('No suitable sheet found in Swimmer Records Workbook');
+        return createFallbackSkills();
+      }
+      
+      // Get the header row with error handling
+      let headerRow = null;
+      try {
+        headerRow = swimmerSheet.getRange(1, 1, 1, swimmerSheet.getLastColumn()).getValues()[0];
+      } catch (rangeError) {
+        Logger.log(`Error reading header row: ${rangeError.message}`);
+        return createFallbackSkills();
+      }
+      
+      if (!headerRow || headerRow.length === 0) {
+        Logger.log('Empty header row in Swimmer Records workbook');
+        return createFallbackSkills();
+      }
+      
+      // Log the headers for debugging
+      Logger.log(`Swimmer Records headers: ${JSON.stringify(headerRow)}`);
+      
+      // Categorize skills
+      const skills = {
+        stage: [], // For stage skills (prefixed with S1, S2, etc.)
+        saw: []    // For SAW skills (prefixed with SAW)
+      };
+      
+      // Start from column 3 (after first and last name)
+      for (let i = 2; i < headerRow.length; i++) {
+        const header = headerRow[i];
+        if (!header) continue;
+        
+        // Check skill type by prefix
+        const headerStr = header.toString();
+        if (headerStr.startsWith('S') && !headerStr.startsWith('SAW')) {
+          skills.stage.push({
+            index: i,
+            header: headerStr
+          });
+        } else if (headerStr.startsWith('SAW')) {
+          skills.saw.push({
+            index: i,
+            header: headerStr
+          });
+        }
+      }
+      
+      // Log the skills we found
+      Logger.log(`Found ${skills.stage.length} stage skills and ${skills.saw.length} SAW skills`);
+      
+      // If no skills found, fall back to test skills
+      if (skills.stage.length === 0 && skills.saw.length === 0) {
+        Logger.log('No skills found in Swimmer Records, using fallback skills');
+        return createFallbackSkills();
+      }
+      
+      return skills;
+      
+    } catch (finalError) {
+      const errorMsg = `Failed to process Swimmer Records: ${finalError.message}`;
+      Logger.log(errorMsg);
+      
+      // Log with ErrorHandling if available
+      if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
+        ErrorHandling.logMessage(errorMsg, 'ERROR', 'getSkillsFromSwimmerRecords');
+      }
+      
       return createFallbackSkills();
     }
-    
-    return skills;
   } catch (error) {
     Logger.log(`Error getting skills from Swimmer Records: ${error.message}`);
     // Return fallback skills instead of throwing an error
@@ -1747,8 +1847,16 @@ function getPrivateLessonStudentsWithDates(classDetails) {
  * Rebuilds the instructor sheet based on the selected class
  * This is called from the menu item rather than automatically on edit
  */
+/**
+ * Rebuilds the dynamic instructor sheet with the selected class
+ * Provides robust error handling to ensure the sheet is always usable
+ * even if some data can't be loaded
+ * 
+ * @return {Sheet} The rebuilt sheet or null on failure
+ */
 function rebuildDynamicInstructorSheet() {
   try {
+    // First get the active spreadsheet
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName(DYNAMIC_INSTRUCTOR_CONFIG.SHEET_NAME);
     
@@ -1778,48 +1886,103 @@ function rebuildDynamicInstructorSheet() {
       PropertiesService.getDocumentProperties().setProperty('SELECTED_CLASS', classFromSheet);
     }
     
-    // Preserve row 1 (the selector row)
-    const selectorRow = sheet.getRange(1, 1, 1, sheet.getMaxColumns()).getValues();
-    const selectorRowFormatting = sheet.getRange(1, 1, 1, sheet.getMaxColumns()).getBackgrounds();
-    
-    // Clear everything except row 1
-    clearSheetExceptSelector(sheet);
-    
-    // Apply the template structure from Excel
-    applyTemplateStructure(sheet, classToUse);
-    
-    // Restore the selector in row 1
-    sheet.getRange(1, 1, 1, sheet.getMaxColumns()).setValues(selectorRow);
-    sheet.getRange(1, 1, 1, sheet.getMaxColumns()).setBackgrounds(selectorRowFormatting);
-    
-    // Make sure the class selector dropdown is preserved
-    createClassSelector(sheet);
-    
-    // Set the frozen rows to 8 (1 selector row + 7 template header rows)
-    sheet.setFrozenRows(DYNAMIC_INSTRUCTOR_CONFIG.TEMPLATE.FROZEN_ROWS);
-    
-    // Populate with student data
-    const classDetails = parseClassDetails(classToUse);
-    populateTemplateWithStudentData(sheet, classDetails);
-    
-    // Show confirmation
-    SpreadsheetApp.getUi().alert(
-      'Instructor Sheet Rebuilt',
-      `The instructor sheet has been rebuilt for class "${classToUse}"`,
-      SpreadsheetApp.getUi().ButtonSet.OK
-    );
-    
-    // Set active sheet to instructor sheet
-    sheet.activate();
-    
-    return sheet;
+    try {
+      // Log what we're doing
+      Logger.log(`Rebuilding instructor sheet for class: ${classToUse}`);
+      
+      // Preserve row 1 (the selector row)
+      const selectorRow = sheet.getRange(1, 1, 1, sheet.getMaxColumns()).getValues();
+      const selectorRowFormatting = sheet.getRange(1, 1, 1, sheet.getMaxColumns()).getBackgrounds();
+      
+      // Clear everything except row 1
+      clearSheetExceptSelector(sheet);
+      
+      // Apply the template structure - this should never fail
+      try {
+        applyTemplateStructure(sheet, classToUse);
+      } catch (templateError) {
+        Logger.log(`Error applying template: ${templateError.message}, continuing with minimal structure`);
+        // Create a minimal emergency header 
+        sheet.getRange('A2').setValue(`Class: ${classToUse}`).setFontWeight('bold');
+        sheet.getRange('A3').setValue('First Name').setFontWeight('bold');
+        sheet.getRange('B3').setValue('Last Name').setFontWeight('bold');
+      }
+      
+      // Restore the selector in row 1 - this should also never fail
+      sheet.getRange(1, 1, 1, sheet.getMaxColumns()).setValues(selectorRow);
+      sheet.getRange(1, 1, 1, sheet.getMaxColumns()).setBackgrounds(selectorRowFormatting);
+      
+      // Make sure the class selector dropdown is preserved
+      try {
+        createClassSelector(sheet);
+      } catch (selectorError) {
+        Logger.log(`Error recreating selector: ${selectorError.message}, continuing with static value`);
+        // Just set the value without the dropdown validation
+        sheet.getRange('C1').setValue(classToUse);
+      }
+      
+      // Set the frozen rows to 8 (1 selector row + 7 template header rows) or default to 3 if that fails
+      try {
+        sheet.setFrozenRows(DYNAMIC_INSTRUCTOR_CONFIG.TEMPLATE.FROZEN_ROWS);
+      } catch (e) {
+        sheet.setFrozenRows(3); // Default to minimal frozen rows
+      }
+      
+      // Parse the class details - this should be robust
+      const classDetails = parseClassDetails(classToUse);
+      
+      // Populate with student data - this might fail due to external data access
+      try {
+        populateTemplateWithStudentData(sheet, classDetails);
+      } catch (dataError) {
+        Logger.log(`Error populating student data: ${dataError.message}, creating minimal empty structure`);
+        
+        // Add error message but keep the sheet usable
+        sheet.getRange('A4').setValue('Data Error: Could not load student data.');
+        sheet.getRange('A5').setValue(`Error message: ${dataError.message}`);
+        sheet.getRange('A6').setValue('Please check system configuration and try again.');
+        
+        // Add a few empty rows for manual data entry
+        sheet.getRange('A8').setValue('Student First Name');
+        sheet.getRange('B8').setValue('Student Last Name');
+        sheet.getRange('C8').setValue('Notes');
+      }
+      
+      // Always show confirmation - the sheet was rebuilt even if some data is missing
+      SpreadsheetApp.getUi().alert(
+        'Instructor Sheet Rebuilt',
+        `The instructor sheet has been rebuilt for class "${classToUse}"`,
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+      
+      // Set active sheet to instructor sheet
+      sheet.activate();
+      
+      return sheet;
+    } catch (mainError) {
+      // Handle errors in the main process, but keep going
+      Logger.log(`Error in main rebuild process: ${mainError.message}`);
+      
+      // Try to create a minimal usable sheet
+      sheet.getRange('A2').setValue(`Class: ${classToUse}`).setFontWeight('bold');
+      sheet.getRange('A3').setValue('Error creating instructor sheet. Please try again.');
+      sheet.getRange('A4').setValue(`Error: ${mainError.message}`);
+      
+      SpreadsheetApp.getUi().alert(
+        'Partial Sheet Created',
+        `There was a problem creating the full instructor sheet, but a simple outline has been created. Error: ${mainError.message}`,
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+      
+      return sheet;
+    }
   } catch (error) {
-    // Handle errors
+    // Handle critical errors that prevent any sheet creation
     if (ErrorHandling && typeof ErrorHandling.handleError === 'function') {
       ErrorHandling.handleError(error, 'rebuildDynamicInstructorSheet', 
         'Error rebuilding instructor sheet. Please try again or contact support.');
     } else {
-      Logger.log(`Error rebuilding instructor sheet: ${error.message}`);
+      Logger.log(`Critical error rebuilding instructor sheet: ${error.message}`);
       SpreadsheetApp.getUi().alert(
         'Error',
         `Failed to rebuild instructor sheet: ${error.message}`,
