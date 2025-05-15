@@ -14,6 +14,7 @@
 const DYNAMIC_INSTRUCTOR_CONFIG = {
   SHEET_NAME: 'Instructor Sheet',
   ROSTER_SHEET_NAME: 'Daxko', // The sheet containing student registration data
+  // Don't try to access the Excel file directly
   HEADERS: {
     CLASS_SELECTOR_LABEL: 'Select Class:',
     FIRST_NAME: 'First Name',
@@ -29,7 +30,8 @@ const DYNAMIC_INSTRUCTOR_CONFIG = {
     STAGE_SKILLS_COLOR: '#F0FFF0',
     SAW_SKILLS_COLOR: '#FFF0F0',
     BEFORE_COLUMN_COLOR: '#E6F2FF', // Light blue for 'Before' columns
-    AFTER_COLUMN_COLOR: '#FFEBCC'   // Light orange for 'After' columns
+    AFTER_COLUMN_COLOR: '#FFEBCC',   // Light orange for 'After' columns
+    SELECTOR_BG_COLOR: '#D9EAD3'     // Light green for selector row
   },
   DAXKO_COLUMNS: {
     FIRST_NAME: 2, // Column C (0-indexed) - Student first name
@@ -37,14 +39,22 @@ const DYNAMIC_INSTRUCTOR_CONFIG = {
     PROGRAM: 22,   // Column W - Program name/description
     SESSION: 23,   // Column X - Session details (day/time)
     SESSION_DATE: 27 // Column AB - Session date
+  },
+  // Template structure constants
+  TEMPLATE: {
+    FROZEN_ROWS: 8, // Changed from 7 to 8 to accommodate selector row
+    ROW_HEIGHTS: {
+      SELECTOR_ROW: 30,
+      HEADER_ROWS: 25
+    }
   }
 };
 
 /**
- * Creates or resets the dynamic instructor sheet
+ * Creates or resets the dynamic class hub sheet
  * @return {Sheet} The created or updated sheet
  */
-function createDynamicInstructorSheet() {
+function createDynamicInstructorSheet() { // Keeping the same function name but updating docs
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName(DYNAMIC_INSTRUCTOR_CONFIG.SHEET_NAME);
@@ -108,8 +118,8 @@ function createDynamicInstructorSheet() {
       sheet.showColumns(1, sheet.getMaxColumns());
     }
     
-    // Set up the basic structure from scratch
-    setupSheetStructure(sheet);
+    // Only set up the selector row (row 1), not the full structure
+    setupSheetSelector(sheet);
     
     // Create class selector dropdown
     createClassSelector(sheet);
@@ -117,10 +127,16 @@ function createDynamicInstructorSheet() {
     // Add onEdit trigger for the sheet
     ensureTriggerExists();
     
-    // Show confirmation
+    // Clear any stored class selection
+    PropertiesService.getDocumentProperties().deleteProperty('SELECTED_CLASS');
+    
+    // Show confirmation with clear instructions
     SpreadsheetApp.getUi().alert(
-      'Dynamic Instructor Sheet Created',
-      'The dynamic instructor sheet has been created. Select a class from the dropdown to load student data.',
+      'Instructor Sheet Created',
+      'The instructor sheet has been created with a class selector. Please:\n\n' +
+      '1. Select a class from the dropdown\n' +
+      '2. Go to YSL Hub > Instructor Sheets > Update with Selected Class\n\n' +
+      'This will populate the sheet with the template and student data.',
       SpreadsheetApp.getUi().ButtonSet.OK
     );
     
@@ -132,12 +148,12 @@ function createDynamicInstructorSheet() {
     // Handle errors
     if (ErrorHandling && typeof ErrorHandling.handleError === 'function') {
       ErrorHandling.handleError(error, 'createDynamicInstructorSheet', 
-        'Error creating dynamic instructor sheet. Please try again or contact support.');
+        'Error creating instructor sheet. Please try again or contact support.');
     } else {
-      Logger.log(`Error creating dynamic instructor sheet: ${error.message}`);
+      Logger.log(`Error creating instructor sheet: ${error.message}`);
       SpreadsheetApp.getUi().alert(
         'Error',
-        `Failed to create dynamic instructor sheet: ${error.message}`,
+        `Failed to create instructor sheet: ${error.message}`,
         SpreadsheetApp.getUi().ButtonSet.OK
       );
     }
@@ -146,34 +162,37 @@ function createDynamicInstructorSheet() {
 }
 
 /**
- * Sets up the basic structure of the instructor sheet
+ * Sets up just the selector row of the instructor sheet
  * @param {Sheet} sheet - The sheet to set up
  */
-function setupSheetStructure(sheet) {
-  // Set column widths
-  sheet.setColumnWidth(1, 150); // First Name
-  sheet.setColumnWidth(2, 150); // Last Name
+function setupSheetSelector(sheet) {
+  // Set row heights
+  sheet.setRowHeight(1, DYNAMIC_INSTRUCTOR_CONFIG.TEMPLATE.ROW_HEIGHTS.SELECTOR_ROW); // Selector row
   
-  // Set up basic headers and format
+  // Set column widths
+  sheet.setColumnWidth(1, 150); // Label
+  sheet.setColumnWidth(2, 60); // Part of label
+  sheet.setColumnWidth(3, 150); // Selector dropdown
+  sheet.setColumnWidth(4, 150); // Selector dropdown extension
+  
+  // Set up selector row
   sheet.getRange('A1:B1').merge()
     .setValue(DYNAMIC_INSTRUCTOR_CONFIG.HEADERS.CLASS_SELECTOR_LABEL)
-    .setFontWeight('bold');
-  
-  sheet.getRange('C1:D1').merge(); // Space for class selector dropdown
-  
-  // Format header row for student info (will be filled when class is selected)
-  sheet.getRange('A3').setValue(DYNAMIC_INSTRUCTOR_CONFIG.HEADERS.FIRST_NAME)
     .setFontWeight('bold')
-    .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
-    .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
+    .setHorizontalAlignment('right')
+    .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SELECTOR_BG_COLOR);
   
-  sheet.getRange('B3').setValue(DYNAMIC_INSTRUCTOR_CONFIG.HEADERS.LAST_NAME)
-    .setFontWeight('bold')
-    .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
-    .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
+  sheet.getRange('C1:D1').merge()
+    .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SELECTOR_BG_COLOR); // Space for class selector dropdown
   
-  // Freeze the header rows
-  sheet.setFrozenRows(3);
+  // Add instructions in row 2
+  sheet.getRange('A2:Z2').merge()
+    .setValue('Select a class above, then use "YSL Hub > Instructor Sheets > Update with Selected Class" to generate the sheet')
+    .setFontStyle('italic')
+    .setHorizontalAlignment('center');
+  
+  // Set frozen rows to just the selector row initially
+  sheet.setFrozenRows(1);
 }
 
 /**
@@ -199,7 +218,7 @@ function createClassSelector(sheet) {
     classRange.setDataValidation(rule);
     
     // Add a note to explain how to use the dropdown
-    classRange.setNote('Select a class to load student data and skills. The sheet will update automatically.');
+    classRange.setNote('Select a class, then use "YSL Hub > Instructor Sheets > Update with Selected Class" to generate the sheet with this class.');
   } catch (error) {
     Logger.log(`Error creating class selector: ${error.message}`);
     throw error;
@@ -363,37 +382,18 @@ function onEditDynamicInstructorSheet(e) {
       
       Logger.log(`Class selected from dropdown: ${selectedClass}`);
       
-      try {
-        // COMPLETELY rebuild the sheet from scratch every time while preserving row 1
-        const sheet = e.range.getSheet();
-        
-        // Freeze row 1 to ensure it's always visible and preserved
-        sheet.setFrozenRows(1);
-        
-        // Delete all content below row 1
-        const lastRow = sheet.getLastRow();
-        if (lastRow > 1) {
-          // Clear contents, formats, and data validations below row 1
-          sheet.getRange(2, 1, lastRow - 1, sheet.getMaxColumns()).clear();
-          sheet.getRange(2, 1, lastRow - 1, sheet.getMaxColumns()).clearFormat();
-          sheet.getRange(2, 1, lastRow - 1, sheet.getMaxColumns()).clearDataValidations();
-        }
-        
-        // Populate the sheet with the selected class's data
-        populateSheetWithClassData(sheet, selectedClass);
-        
-        // Ensure class selector dropdown remains after populating the sheet
-        createClassSelector(sheet);
-      } catch (processError) {
-        Logger.log(`Error processing class selection: ${processError.message}`);
-        
-        // Show user-friendly error
-        const sheet = e.range.getSheet();
-        sheet.getRange('A2').setValue(`Error: Could not load class data. Please try again or contact support.`);
-        
-        // Log detailed error for troubleshooting
-        console.error(`Failed to process class selection: ${processError.stack || processError.message}`);
-      }
+      // Store the selected class in the sheet properties so it can be referenced later when rebuilding
+      PropertiesService.getDocumentProperties().setProperty('SELECTED_CLASS', selectedClass);
+      
+      // Show a toast message instructing the user to use the Rebuild option
+      e.range.getSheet().getParent().toast(
+        'Use "Rebuild Instructor Sheet" from the YSL Hub menu to apply this selection', 
+        'Class Selected', 
+        8 // Show for 8 seconds
+      );
+      
+      // IMPORTANT: Return immediately to prevent the old function body from running
+      return;
     }
   } catch (error) {
     Logger.log(`Error in onEditDynamicInstructorSheet: ${error.message}`);
@@ -1743,9 +1743,392 @@ function getPrivateLessonStudentsWithDates(classDetails) {
   }
 }
 
+/**
+ * Rebuilds the instructor sheet based on the selected class
+ * This is called from the menu item rather than automatically on edit
+ */
+function rebuildDynamicInstructorSheet() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(DYNAMIC_INSTRUCTOR_CONFIG.SHEET_NAME);
+    
+    if (!sheet) {
+      // If sheet doesn't exist, create it first
+      return createDynamicInstructorSheet();
+    }
+    
+    // Get the selected class from properties
+    const selectedClass = PropertiesService.getDocumentProperties().getProperty('SELECTED_CLASS');
+    
+    // If no class is selected, get it from the sheet
+    const classFromSheet = sheet.getRange('C1:D1').getValue();
+    const classToUse = selectedClass || classFromSheet;
+    
+    if (!classToUse) {
+      SpreadsheetApp.getUi().alert(
+        'No Class Selected',
+        'Please select a class from the dropdown before rebuilding the sheet.',
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+      return null;
+    }
+    
+    // Store the class selection in case it came from the sheet
+    if (!selectedClass && classFromSheet) {
+      PropertiesService.getDocumentProperties().setProperty('SELECTED_CLASS', classFromSheet);
+    }
+    
+    // Preserve row 1 (the selector row)
+    const selectorRow = sheet.getRange(1, 1, 1, sheet.getMaxColumns()).getValues();
+    const selectorRowFormatting = sheet.getRange(1, 1, 1, sheet.getMaxColumns()).getBackgrounds();
+    
+    // Clear everything except row 1
+    clearSheetExceptSelector(sheet);
+    
+    // Apply the template structure from Excel
+    applyTemplateStructure(sheet, classToUse);
+    
+    // Restore the selector in row 1
+    sheet.getRange(1, 1, 1, sheet.getMaxColumns()).setValues(selectorRow);
+    sheet.getRange(1, 1, 1, sheet.getMaxColumns()).setBackgrounds(selectorRowFormatting);
+    
+    // Make sure the class selector dropdown is preserved
+    createClassSelector(sheet);
+    
+    // Set the frozen rows to 8 (1 selector row + 7 template header rows)
+    sheet.setFrozenRows(DYNAMIC_INSTRUCTOR_CONFIG.TEMPLATE.FROZEN_ROWS);
+    
+    // Populate with student data
+    const classDetails = parseClassDetails(classToUse);
+    populateTemplateWithStudentData(sheet, classDetails);
+    
+    // Show confirmation
+    SpreadsheetApp.getUi().alert(
+      'Instructor Sheet Rebuilt',
+      `The instructor sheet has been rebuilt for class "${classToUse}"`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    
+    // Set active sheet to instructor sheet
+    sheet.activate();
+    
+    return sheet;
+  } catch (error) {
+    // Handle errors
+    if (ErrorHandling && typeof ErrorHandling.handleError === 'function') {
+      ErrorHandling.handleError(error, 'rebuildDynamicInstructorSheet', 
+        'Error rebuilding instructor sheet. Please try again or contact support.');
+    } else {
+      Logger.log(`Error rebuilding instructor sheet: ${error.message}`);
+      SpreadsheetApp.getUi().alert(
+        'Error',
+        `Failed to rebuild instructor sheet: ${error.message}`,
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+    }
+    return null;
+  }
+}
+
+/**
+ * Clears the sheet except for the selector row (row 1)
+ * @param {Sheet} sheet - The sheet to clear
+ */
+function clearSheetExceptSelector(sheet) {
+  const lastRow = sheet.getLastRow();
+  const totalColumns = sheet.getMaxColumns();
+  
+  if (lastRow > 1) {
+    // Clear contents, formats, and validations below row 1
+    sheet.getRange(2, 1, lastRow - 1, totalColumns).clear();
+    sheet.getRange(2, 1, lastRow - 1, totalColumns).clearFormat();
+    
+    // Try to clear data validations if available
+    try {
+      if (typeof sheet.getRange(2, 1, lastRow - 1, totalColumns).clearDataValidations === 'function') {
+        sheet.getRange(2, 1, lastRow - 1, totalColumns).clearDataValidations();
+      }
+    } catch (e) {
+      Logger.log(`Error clearing data validations: ${e.message}. Continuing anyway.`);
+    }
+  }
+  
+  // Reset column widths except row 1
+  for (let i = 1; i <= totalColumns; i++) {
+    sheet.setColumnWidth(i, 100); // Reset to default width
+  }
+  
+  // Reset row heights except row 1
+  for (let i = 2; i <= Math.max(lastRow, 100); i++) {
+    sheet.setRowHeight(i, 21); // Reset to default height
+  }
+}
+
+/**
+ * Applies the template structure from the Excel template
+ * @param {Sheet} sheet - The sheet to update
+ * @param {string} className - The selected class name
+ */
+function applyTemplateStructure(sheet, className) {
+  try {
+    // Manual approach instead of trying to use the Excel file directly
+    
+    // Set the title in row 2
+    sheet.getRange('A2:Z2').merge()
+      .setValue('YSL v6 & SAW ASSESSMENT SHEET')
+      .setFontWeight('bold')
+      .setHorizontalAlignment('center')
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SECTION_COLOR);
+    
+    // Set the class information header in row 3
+    sheet.getRange('A3:Z3').merge()
+      .setValue('Class Information')
+      .setFontWeight('bold')
+      .setHorizontalAlignment('center')
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
+      .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
+    
+    // Extract class details from the selected class
+    const classDetails = parseClassDetails(className);
+    
+    // Set class details in rows 4-6
+    // Row 4: Program & Day
+    sheet.getRange('A4').setValue('Program:').setFontWeight('bold');
+    sheet.getRange('B4:C4').merge().setValue(classDetails.program);
+    sheet.getRange('D4').setValue('Day:').setFontWeight('bold');
+    sheet.getRange('E4:F4').merge().setValue(classDetails.day);
+    
+    // Row 5: Location & Instructor & Time
+    sheet.getRange('A5').setValue('Location:').setFontWeight('bold');
+    sheet.getRange('B5:C5').merge().setValue('PenBay YMCA'); // Default location
+    sheet.getRange('D5').setValue('Instructor:').setFontWeight('bold');
+    sheet.getRange('E5:F5').merge(); // Empty for instructor to fill in
+    sheet.getRange('G5').setValue('Time:').setFontWeight('bold'); 
+    sheet.getRange('H5:I5').merge().setValue(classDetails.time); // Add time
+    
+    // Row 6: Students count
+    sheet.getRange('A6').setValue('Students:').setFontWeight('bold');
+    sheet.getRange('B6:C6').merge(); // Will be filled with student count later
+    
+    // Row 7: Empty spacing row
+    
+    // Row 8: Column headers for student assessment
+    setupStudentColumnHeaders(sheet, classDetails);
+    
+    // Format all headers consistently
+    sheet.getRange('A2:Z8').setHorizontalAlignment('center').setVerticalAlignment('middle');
+    
+    // Set row heights for consistent layout
+    for (let i = 2; i <= 8; i++) {
+      sheet.setRowHeight(i, DYNAMIC_INSTRUCTOR_CONFIG.TEMPLATE.ROW_HEIGHTS.HEADER_ROWS);
+    }
+  } catch (error) {
+    Logger.log(`Error applying template structure: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Sets up student column headers in row 8 based on the template
+ * @param {Sheet} sheet - The sheet to update
+ * @param {Object} classDetails - The parsed class details
+ */
+function setupStudentColumnHeaders(sheet, classDetails) {
+  // Row 8 contains student column headers
+  sheet.getRange('A8').setValue('Date').setFontWeight('bold');
+  
+  // Columns B-F for assessment criteria labels
+  sheet.getRange('B8:F8').merge().setValue('Assessment Criteria').setFontWeight('bold');
+  
+  // Format the header row
+  sheet.getRange('A8:F8')
+    .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
+    .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR);
+  
+  // Set column widths for assessment criteria section
+  sheet.setColumnWidth(1, 100); // Date
+  sheet.setColumnWidth(2, 120); // Assessment criteria
+  sheet.setColumnWidth(3, 120);
+  sheet.setColumnWidth(4, 120);
+  sheet.setColumnWidth(5, 120);
+  sheet.setColumnWidth(6, 120);
+}
+
+/**
+ * Populates the template with student data based on class details
+ * @param {Sheet} sheet - The sheet to update
+ * @param {Object} classDetails - The parsed class details
+ */
+function populateTemplateWithStudentData(sheet, classDetails) {
+  try {
+    // Get students for this class
+    const students = getStudentsForClass(classDetails);
+    
+    // Update student count in the header
+    sheet.getRange('B6:C6').setValue(students.length);
+    
+    // Determine if this is a private lesson
+    if (classDetails.isPrivateLesson) {
+      populatePrivateLessonData(sheet, classDetails, students);
+    } else {
+      populateGroupLessonData(sheet, classDetails, students);
+    }
+  } catch (error) {
+    Logger.log(`Error populating template with student data: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Populates the template for a group lesson
+ * @param {Sheet} sheet - The sheet to update
+ * @param {Object} classDetails - The parsed class details
+ * @param {Array} students - Array of student objects
+ */
+function populateGroupLessonData(sheet, classDetails, students) {
+  try {
+    // Start at column G (7) for student columns
+    let currentColumn = 7;
+    
+    // For each student, create a pair of B/E columns
+    for (let i = 0; i < students.length; i++) {
+      // Create merged header for student name
+      sheet.getRange(8, currentColumn, 1, 2).merge()
+        .setValue(`${students[i].firstName} ${students[i].lastName}`)
+        .setFontWeight('bold')
+        .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
+        .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR)
+        .setHorizontalAlignment('center');
+      
+      // Label the B and E subcolumns
+      sheet.getRange(9, currentColumn).setValue('B')
+        .setFontWeight('bold')
+        .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.BEFORE_COLUMN_COLOR)
+        .setHorizontalAlignment('center');
+      
+      sheet.getRange(9, currentColumn + 1).setValue('E')
+        .setFontWeight('bold')
+        .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.AFTER_COLUMN_COLOR)
+        .setHorizontalAlignment('center');
+      
+      // Set column widths
+      sheet.setColumnWidth(currentColumn, 60);
+      sheet.setColumnWidth(currentColumn + 1, 60);
+      
+      // Move to next student columns
+      currentColumn += 2;
+    }
+    
+    // Add first date row at row 10
+    const today = new Date();
+    sheet.getRange('A10').setValue(today);
+    
+    // Add 7 more date rows with formula =A10+7, =A11+7, etc.
+    for (let i = 1; i < 8; i++) {
+      const currentRow = 10 + i;
+      const previousRow = currentRow - 1;
+      sheet.getRange(`A${currentRow}`).setFormula(`=A${previousRow}+7`);
+    }
+    
+    // Add assessment criteria sections starting at row 18
+    // Extract stage from class name
+    const stageInfo = extractStageFromClassName(classDetails.program);
+    const stageDisplay = stageInfo.value ? `${stageInfo.prefix}${stageInfo.value.toUpperCase()}` : 'S1'; // Default to S1 if no stage found
+    
+    // Add S1 Pass criteria (rows 18-20)
+    sheet.getRange('A18').setValue('Assessment:').setFontWeight('bold');
+    sheet.getRange('B18:F18').merge()
+      .setValue(`${stageDisplay} Pass`)
+      .setFontWeight('bold')
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SECTION_COLOR);
+    
+    sheet.getRange('A19').setValue('Criteria:').setFontWeight('bold');
+    sheet.getRange('B19:F19').merge()
+      .setValue(`${stageDisplay} Repeat`)
+      .setFontWeight('bold')
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SECTION_COLOR);
+    
+    sheet.getRange('A20').setValue('Notes:').setFontWeight('bold');
+    sheet.getRange('B20:F20').merge()
+      .setValue(`${stageDisplay} Mid Notes`)
+      .setFontWeight('bold')
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.SECTION_COLOR);
+    
+    // Format remaining cells in the assessment rows for data entry
+    for (let row = 18; row <= 20; row++) {
+      for (let col = 7; col < currentColumn; col++) {
+        sheet.getRange(row, col)
+          .setHorizontalAlignment('center')
+          .setVerticalAlignment('middle');
+      }
+    }
+  } catch (error) {
+    Logger.log(`Error populating group lesson data: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Populates the template for a private lesson
+ * @param {Sheet} sheet - The sheet to update
+ * @param {Object} classDetails - The parsed class details
+ * @param {Array} studentsWithDates - Array of student objects with dates
+ */
+function populatePrivateLessonData(sheet, classDetails, studentsWithDates) {
+  try {
+    // For private lessons, use a different layout
+    // Get students with dates information
+    const students = getPrivateLessonStudentsWithDates(classDetails);
+    
+    // Set up different headers
+    sheet.getRange('A8').setValue('Student').setFontWeight('bold');
+    sheet.getRange('B8').setValue('Date').setFontWeight('bold');
+    sheet.getRange('C8').setValue('Instructor').setFontWeight('bold');
+    sheet.getRange('D8').setValue('Notes').setFontWeight('bold');
+    sheet.getRange('E8:Z8').setValue('Progress Assessment').setFontWeight('bold');
+    
+    // Format headers
+    sheet.getRange('A8:Z8')
+      .setBackground(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_COLOR)
+      .setFontColor(DYNAMIC_INSTRUCTOR_CONFIG.CELL_STYLES.HEADER_TEXT_COLOR)
+      .setHorizontalAlignment('center');
+    
+    // Add student data
+    for (let i = 0; i < students.length; i++) {
+      const rowIndex = 9 + i;
+      
+      // Student name
+      sheet.getRange(rowIndex, 1).setValue(`${students[i].firstName} ${students[i].lastName}`);
+      
+      // Session date
+      if (students[i].date) {
+        sheet.getRange(rowIndex, 2).setValue(students[i].date);
+      }
+      
+      // Leave instructor blank for manual entry
+      
+      // Add alternating row colors
+      if (i % 2 === 1) {
+        sheet.getRange(rowIndex, 1, 1, 6).setBackground('#f3f3f3');
+      }
+    }
+    
+    // Set column widths for private lessons
+    sheet.setColumnWidth(1, 150); // Student
+    sheet.setColumnWidth(2, 100); // Date
+    sheet.setColumnWidth(3, 150); // Instructor
+    sheet.setColumnWidth(4, 300); // Notes
+    sheet.setColumnWidth(5, 300); // Progress Assessment
+  } catch (error) {
+    Logger.log(`Error populating private lesson data: ${error.message}`);
+    throw error;
+  }
+}
+
 // Make functions available to other modules
 const DynamicInstructorSheet = {
   createDynamicInstructorSheet: createDynamicInstructorSheet,
   onEditDynamicInstructorSheet: onEditDynamicInstructorSheet,
-  setupPrivateLessonLayout: setupPrivateLessonLayout
+  setupPrivateLessonLayout: setupPrivateLessonLayout,
+  rebuildDynamicInstructorSheet: rebuildDynamicInstructorSheet
 };

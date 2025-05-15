@@ -90,11 +90,11 @@ function onEdit(e) {
  * @param {Sheet} sheet - The Classes sheet
  * @param {number} row - The edited row
  * @param {number} col - The edited column
- * @param {boolean} value - The new cell value for the checkbox
+ * @param {string} value - The new cell value
  */
 function handleClassesSheetEdit(sheet, row, col, value) {
-  // Check if the edit is in the checkbox column (column 1)
-  if (col === 1 && row > 1 && value === true) {
+  // Check if the edit is in the "Select Class" column (column 1)
+  if (col === 1 && row > 1 && value === 'Select') {
     try {
       // Get class information
       const classInfo = {

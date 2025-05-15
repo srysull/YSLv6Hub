@@ -65,29 +65,32 @@ function createMenu() {
     } else {
       // System is initialized - show operational options
       try {
-        // Create a simplified menu structure with only essential operations
-        
-        // 1. Class Management - Core functionality for managing classes
         menu.addSubMenu(ui.createMenu('Class Management')
-              .addItem('Create Dynamic Class Hub', 'DynamicInstructorSheet_createDynamicInstructorSheet')
-              .addItem('Update with Selected Class', 'DynamicInstructorSheet_rebuildDynamicInstructorSheet')
-              .addSeparator()
-              .addItem('Refresh Class List', 'DataIntegrationModule_updateClassSelector')
-              .addItem('Refresh Roster Data', 'DataIntegrationModule_refreshRosterData'))
-        
-        // 2. Communications - Enhanced communication functions
-        .addSubMenu(ui.createMenu('Communications')
-              .addItem('Create Dynamic Communications Hub', 'CommunicationModule_createCommunicationsHub')
-              .addItem('Create Communication Log', 'CommunicationModule_createCommunicationLog')
-              .addSeparator()
-              .addItem('Send Selected Communication', 'CommunicationModule_sendSelectedCommunication')
-              .addSeparator()
-              .addItem('Send Mid-Session Reports', 'ReportingModule_generateMidSessionReports')
-              .addItem('Send End-Session Reports', 'ReportingModule_generateEndSessionReports')
-              .addItem('Send Welcome Emails', 'CommunicationModule_sendWelcomeEmails'))
-        
-        // 3. System - Only the essential system configuration
-        .addItem('System Configuration', 'AdministrativeModule_showConfigurationDialog')
+              .addItem('Update Class Selector', 'DataIntegrationModule_updateClassSelector')
+              .addItem('Refresh Roster Data', 'DataIntegrationModule_refreshRosterData')
+              .addItem('Update Instructor Data', 'DataIntegrationModule_updateInstructorData')
+              .addItem('Generate Instructor Sheets', 'InstructorResourceModule_generateInstructorSheets'))
+            .addSubMenu(ui.createMenu('Assessment Management')
+              .addItem('Push Assessments to Swimmer Log', 'DataIntegrationModule_pushAssessmentsToSwimmerLog')
+              .addItem('Pull Latest Assessment Criteria', 'DataIntegrationModule_pullAssessmentCriteria'))
+            .addSubMenu(ui.createMenu('Reports')
+              .addItem('Report Assessment Criteria', 'DataIntegrationModule_reportAssessmentCriteria')
+              .addItem('Diagnose Criteria Import', 'DataIntegrationModule_diagnoseCriteriaImport')
+              .addItem('Generate Mid-Session Reports', 'ReportingModule_generateMidSessionReports')
+              .addItem('Generate End-Session Reports', 'ReportingModule_generateEndSessionReports'))
+            .addSubMenu(ui.createMenu('Communications')
+              .addItem('Email Class Participants', 'CommunicationModule_emailClassParticipants')
+              .addItem('Send Class Announcements', 'CommunicationModule_sendClassAnnouncements')
+              .addItem('Test Welcome Email', 'CommunicationModule.testWelcomeEmail')
+              .addItem('Send Welcome Email', 'CommunicationModule.sendWelcomeEmails'))
+            .addSubMenu(ui.createMenu('System')
+              .addItem('System Configuration', 'AdministrativeModule_showConfigurationDialog')
+              .addItem('View System Log', 'ErrorHandling_showLogViewer')
+              .addItem('Hide System Log', 'ErrorHandling_hideLogSheet')
+              .addItem('Clear System Log', 'ErrorHandling_clearLog')
+              .addItem('Export System Log', 'ErrorHandling_exportLog')
+              .addItem('Run System Diagnostics', 'VersionControl_showDiagnostics')
+              .addItem('View Version Information', 'VersionControl_showVersionInfo'))
             .addSeparator()
             .addItem('About YSL Hub', 'AdministrativeModule_showAboutDialog');
         hasItems = true;
@@ -839,7 +842,6 @@ function showAboutDialog() {
       'providing class management, assessment tracking, report generation, ' +
       'and communication capabilities.\n\n' +
       `${versionInfo}\n` +
-      'Author: Sean R. Sullivan\n' +
       'PenBay YMCA Aquatics Department',
       ui.ButtonSet.OK
     );

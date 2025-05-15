@@ -15,37 +15,20 @@
  * @return {Menu} The updated menu
  */
 function addDynamicInstructorMenuItems(menu) {
-  return menu.addItem('Create Instructor Sheet (Dynamic)', 'DynamicInstructorSheet.createDynamicInstructorSheet');
+  return menu
+    .addItem('Create New Instructor Sheet', 'DynamicInstructorSheet.createDynamicInstructorSheet')
+    .addSeparator()
+    .addItem('Update Instructor Sheet with Selected Class', 'DynamicInstructorSheet.rebuildDynamicInstructorSheet');
 }
 
 /**
  * Updates the YSL Hub menu with Dynamic Instructor Sheet options
  */
+// This function is no longer used since we've integrated the menu directly in AdministrativeModule.createMenu
 function updateMenuWithDynamicInstructor() {
   try {
-    const ui = SpreadsheetApp.getUi();
-    const menu = ui.createMenu('YSL Hub');
-    
-    // Check if system is initialized
-    const isInitialized = GlobalFunctions.safeGetProperty('systemInitialized') === 'true';
-    
-    if (isInitialized) {
-      menu.addSubMenu(ui.createMenu('Instructor Tools')
-            .addItem('Create Instructor Sheet', 'DynamicInstructorSheet.createDynamicInstructorSheet')
-            .addItem('Update Class List', 'DataIntegrationModule_updateClassSelector'));
-      
-      menu.addSubMenu(ui.createMenu('Data Management')
-            .addItem('Refresh Daxko Data', 'DataIntegrationModule_refreshRosterData')
-            .addItem('Update Configuration', 'AdministrativeModule.showConfigDialog'));
-    } else {
-      menu.addItem('Initialize System', 'AdministrativeModule.showInitializationDialog');
-    }
-    
-    menu.addSeparator()
-        .addItem('About YSL Hub', 'AdministrativeModule_showAboutDialog')
-        .addToUi();
-    
-    return menu;
+    Logger.log('Using the integrated menu structure in AdministrativeModule instead');
+    return null;
   } catch (error) {
     Logger.log(`Error updating menu with dynamic instructor: ${error.message}`);
     return null;
