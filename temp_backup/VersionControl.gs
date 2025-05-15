@@ -4,16 +4,16 @@
  * This module manages system versions, updates, and diagnostics.
  * It provides a centralized way to track versions and apply updates.
  * 
- * @author PenBay YMCA
- * @version 1.0
- * @date 2025-04-27
+ * @author Sean R. Sullivan
+ * @version 2.0
+ * @date 2025-05-14
  */
 
 // Version constants
 const VERSION = {
   CURRENT: '2.0.0',
   MIN_COMPATIBLE: '1.0.0',
-  RELEASE_DATE: '2025-04-27'
+  RELEASE_DATE: '2025-05-14'
 };
 
 // Script properties keys
@@ -73,9 +73,12 @@ function getVersionInfo() {
     updateLog = [];
   }
   
+  // Always use the current date for the release date to ensure it's up to date
+  const currentDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  
   return {
     currentVersion: currentVersion,
-    releaseDate: VERSION.RELEASE_DATE,
+    releaseDate: currentDate,
     lastUpdate: lastUpdate,
     minCompatibleVersion: VERSION.MIN_COMPATIBLE,
     updateHistory: updateLog

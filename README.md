@@ -37,22 +37,26 @@ YSLv6Hub is a comprehensive Google Workspace system for managing the Youth Swim 
 
 ## Module Structure
 
-- **AdministrativeModule.gs**: System initialization and configuration
-- **CommunicationModule.gs**: Email and notifications
-- **DataIntegrationModule.gs**: Data processing and management
-- **ErrorHandling.gs**: Centralized error handling and logging
-- **Globals.gs**: Global functions and utilities
-- **InstructorResourceModule.gs**: Instructor-specific tools
-- **MenuWrappers.gs**: Menu creation and event handlers
-- **ReportingModule.gs**: Assessment reports generation
-- **VersionControl.gs**: Version management and updates
+- **01_Globals.gs**: Global functions and utilities
+- **02_ErrorHandling.gs**: Centralized error handling and logging
+- **03_VersionControl.gs**: Version management and updates
+- **04_AdministrativeModule.gs**: System initialization and configuration
+- **05_MenuWrappers.gs**: Menu creation and event handlers
+- **06_InputValidation.gs**: Data validation functions and utilities
+- **07_DataIntegrationModule.gs**: Data processing and management
+- **08_UserGuide.gs**: User guide and documentation
+- **09_BlankSheetInitializer.gs**: Tools for creating system structure in a blank spreadsheet
+- **10_EmailTemplates.gs**: Template management for communication
+- **11_CommunicationModule.gs**: Email and notifications
+- **12_ReportingModule.gs**: Assessment reports generation
+- **13_InstructorResourceModule.gs**: Instructor-specific tools
+- **14_DynamicInstructorIntegration.gs**: Dynamic instructor integration functionality
+- **15_DynamicInstructorSheet.gs**: Dynamic instructor sheets management
+- **16_SessionTransitionModule.gs**: Session transition management
+- **17_HistoryModule.gs**: History tracking and reporting
 
-### New Modules
-- **BlankSheetInitializer.gs**: Tools for creating system structure in a blank spreadsheet
-- **EmailTemplates.gs**: Template management for communication
+### Additional Files
 - **FixedConfigDialog.gs**: Fixed version of configuration dialog
-- **InputValidation.gs**: Data validation functions and utilities
-- **YSLv6HubUpgrade.gs**: Integration of all enhancements
 
 ## Using Email Templates
 

@@ -4,9 +4,9 @@
  * This module handles the generation and distribution of student progress reports,
  * including mid-session and end-session evaluations.
  * 
- * @author PenBay YMCA
+ * @author Sean R. Sullivan
  * @version 2.0
- * @date 2025-04-27
+ * @date 2025-05-14
  */
 
 // Global constants

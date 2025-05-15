@@ -4,9 +4,9 @@
  * This module handles communications with class participants and stakeholders,
  * including email notifications, class announcements, and schedule updates.
  * 
- * @author PenBay YMCA
+ * @author Sean R. Sullivan
  * @version 2.0
- * @date 2025-04-27
+ * @date 2025-05-14
  */
 
 // Default sender details

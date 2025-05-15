@@ -6,7 +6,7 @@ This document outlines the testing process for the enhanced YSLv6Hub system. Use
 
 1. Create a new Google Sheet
 2. Go to Extensions > Apps Script
-3. Copy all `.gs` files into the Apps Script editor
+3. Copy all numbered `.gs` files (01_Globals.gs through 17_HistoryModule.gs) and FixedConfigDialog.gs into the Apps Script editor
 4. Save and close the editor
 5. Refresh your spreadsheet
 

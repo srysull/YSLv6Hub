@@ -4,9 +4,9 @@
  * This module provides common functions and event handlers accessible
  * to all other modules in the system.
  * 
- * @author PenBay YMCA
+ * @author Sean R. Sullivan
  * @version 2.0
- * @date 2025-04-27
+ * @date 2025-05-14
  */
 
 /**
@@ -90,11 +90,11 @@ function onEdit(e) {
  * @param {Sheet} sheet - The Classes sheet
  * @param {number} row - The edited row
  * @param {number} col - The edited column
- * @param {string} value - The new cell value
+ * @param {boolean} value - The new cell value for the checkbox
  */
 function handleClassesSheetEdit(sheet, row, col, value) {
-  // Check if the edit is in the "Select Class" column (column 1)
-  if (col === 1 && row > 1 && value === 'Select') {
+  // Check if the edit is in the checkbox column (column 1)
+  if (col === 1 && row > 1 && value === true) {
     try {
       // Get class information
       const classInfo = {
