@@ -15,48 +15,98 @@
  */
 function onOpen() {
   try {
-    // Create a minimal menu immediately as a fallback
-    const ui = SpreadsheetApp.getUi();
+    // Try to create the full menu first
+    createFullMenu();
+    
+    // Log successful menu creation
+    Logger.log('Full menu created in onOpen trigger');
+  } catch (error) {
+    // If full menu fails, create a simple fallback menu
+    Logger.log('Error creating full menu: ' + error.message);
+    
+    var ui = SpreadsheetApp.getUi();
     ui.createMenu('YSL Hub')
       .addItem('Initialize System', 'AdministrativeModule_showInitializationDialog')
-      .addItem('System Configuration', 'AdministrativeModule_showConfigurationDialog')
+      .addItem('Fix Menu', 'fixMenu')
       .addItem('About YSL Hub', 'AdministrativeModule_showAboutDialog')
       .addToUi();
-    
-    // Try using the more robust menu system
-    if (typeof AdministrativeModule !== 'undefined' && 
-        typeof AdministrativeModule.createMenu === 'function') {
-      AdministrativeModule.createMenu();
-    }
-    
-    // Initialize error handling if available
-    if (typeof ErrorHandling !== 'undefined' && 
-        typeof ErrorHandling.initializeErrorHandling === 'function') {
-      ErrorHandling.initializeErrorHandling();
-    }
-    
-    // Initialize version control if available
-    if (typeof VersionControl !== 'undefined' && 
-        typeof VersionControl.initializeVersionControl === 'function') {
-      VersionControl.initializeVersionControl();
-    }
-    
-    // Log the opening event
-    Logger.log('Spreadsheet opened - onOpen trigger executed');
-  } catch (error) {
-    // Log error as a last resort
-    Logger.log(`Error in onOpen trigger: ${error.message}`);
-    
-    // Create an emergency menu
-    try {
-      SpreadsheetApp.getUi()
-        .createMenu('YSL Emergency')
-        .addItem('Fix System', 'AdministrativeModule_fixSystemInitializationProperty')
-        .addToUi();
-    } catch (finalError) {
-      Logger.log(`Failed to create emergency menu: ${finalError.message}`);
-    }
+      
+    Logger.log('Fallback menu created');
   }
+}
+
+/**
+ * Emergency function to fix menu issues
+ */
+function fixMenu() {
+  try {
+    // Force properties to true
+    PropertiesService.getScriptProperties().setProperty('systemInitialized', 'true');
+    PropertiesService.getScriptProperties().setProperty('INITIALIZED', 'true');
+    
+    // Create the full menu
+    createFullMenu();
+    
+    // Show confirmation
+    SpreadsheetApp.getUi().alert(
+      'Menu Fixed',
+      'System properties have been reset and menu has been created.',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    
+    return true;
+  } catch (error) {
+    Logger.log('Error fixing menu: ' + error.message);
+    SpreadsheetApp.getUi().alert('Error: ' + error.message);
+    return false;
+  }
+}
+
+/**
+ * Creates the full operational menu directly
+ */
+function createFullMenu() {
+  var ui = SpreadsheetApp.getUi();
+  
+  var menu = ui.createMenu('YSL Hub');
+  
+  // 1. Class Management section
+  menu.addSubMenu(ui.createMenu('Class Management')
+    .addItem('Create Dynamic Class Hub', 'DynamicInstructorSheet_createDynamicInstructorSheet')
+    .addItem('Update with Selected Class', 'DynamicInstructorSheet_rebuildDynamicInstructorSheet')
+    .addSeparator()
+    .addItem('Refresh Class List', 'DataIntegrationModule_updateClassSelector')
+    .addItem('Refresh Roster Data', 'DataIntegrationModule_refreshRosterData'));
+    
+  // 2. Communications section
+  menu.addSubMenu(ui.createMenu('Communications')
+    .addItem('Create Communications Hub', 'CommunicationModule_createCommunicationsHub')
+    .addItem('Create Communication Log', 'CommunicationModule_createCommunicationLog')
+    .addItem('Send Selected Communication', 'CommunicationModule_sendSelectedCommunication')
+    .addSeparator()
+    .addItem('Send Mid-Session Reports', 'ReportingModule_generateMidSessionReports')
+    .addItem('Send End-Session Reports', 'ReportingModule_generateEndSessionReports')
+    .addItem('Send Welcome Emails', 'CommunicationModule_sendWelcomeEmails'));
+    
+  // 3. System section
+  menu.addSubMenu(ui.createMenu('System')
+    .addItem('Create User Guide', 'UserGuide_createUserGuideSheet')
+    .addSeparator()
+    .addItem('View History', 'HistoryModule_createHistorySheet')
+    .addSeparator()
+    .addItem('Start New Session', 'SessionTransitionModule_startSessionTransition')
+    .addItem('Resume Session Transition', 'SessionTransitionModule_resumeSessionTransition')
+    .addSeparator()
+    .addItem('System Configuration', 'AdministrativeModule_showConfigurationDialog')
+    .addItem('Show Logs', 'ErrorHandling_showLogViewer'));
+    
+  // Add About item and the menu to UI
+  menu.addSeparator()
+    .addItem('Fix Menu', 'fixMenu')
+    .addItem('About YSL Hub', 'AdministrativeModule_showAboutDialog')
+    .addToUi();
+    
+  return menu;
 }
 
 /**

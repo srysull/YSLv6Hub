@@ -1,1 +1,16 @@
-**/.claude/settings.local.json
+# Temporary and backup files
+temp_backup/
+*.bak
+*.tmp
+*.backup
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.idea/
+.vscode/
+
+# Zip files
+*.zip
