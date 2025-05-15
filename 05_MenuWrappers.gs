@@ -339,3 +339,13 @@ function AdministrativeModule_fixSystemInitializationProperty() {
   }
   return AdministrativeModule.fixSystemInitializationProperty();
 }
+
+/**
+ * Wrapper function for fixSwimmerRecordsAccess
+ */
+function fixSwimmerRecordsAccess_menuWrapper() {
+  if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
+    ErrorHandling.logMessage('Menu: Fix Swimmer Records Access', 'INFO', 'fixSwimmerRecordsAccess_menuWrapper');
+  }
+  return fixSwimmerRecordsAccess();
+}

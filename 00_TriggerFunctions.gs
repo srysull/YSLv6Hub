@@ -27,6 +27,7 @@ function onOpen() {
     var ui = SpreadsheetApp.getUi();
     ui.createMenu('YSL Hub')
       .addItem('Initialize System', 'AdministrativeModule_showInitializationDialog')
+      .addItem('Fix Swimmer Records Access', 'fixSwimmerRecordsAccess_menuWrapper')
       .addItem('Fix Menu', 'fixMenu')
       .addItem('About YSL Hub', 'AdministrativeModule_showAboutDialog')
       .addToUi();
@@ -75,7 +76,7 @@ function createFullMenu() {
     .addItem('Create Dynamic Class Hub', 'DynamicInstructorSheet_createDynamicInstructorSheet')
     .addItem('Update with Selected Class', 'DynamicInstructorSheet_rebuildDynamicInstructorSheet')
     .addSeparator()
-    .addItem('Fix Swimmer Records Access', 'fixSwimmerRecordsAccess')
+    .addItem('Fix Swimmer Records Access', 'fixSwimmerRecordsAccess_menuWrapper')
     .addSeparator()
     .addItem('Refresh Class List', 'DataIntegrationModule_updateClassSelector')
     .addItem('Refresh Roster Data', 'DataIntegrationModule_refreshRosterData'));
@@ -114,6 +115,7 @@ function createFullMenu() {
 /**
  * Fixes Swimmer Records access issues by updating the configuration
  * with valid spreadsheet ID
+ * This function is exposed globally for direct menu access
  */
 function fixSwimmerRecordsAccess() {
   try {
@@ -133,6 +135,39 @@ function fixSwimmerRecordsAccess() {
       if (!userInput) {
         ui.alert('Error', 'You must enter a URL or ID.', ui.ButtonSet.OK);
         return;
+      }
+      
+      // Try to validate the URL by attempting to open the spreadsheet
+      try {
+        // Extract ID from URL if needed
+        let ssId = userInput;
+        
+        // If it looks like a URL, try to extract ID
+        if (userInput.includes('/')) {
+          const urlPattern = /[-\w]{25,}/;
+          const match = userInput.match(urlPattern);
+          if (match && match[0]) {
+            ssId = match[0];
+          }
+        }
+        
+        // Try opening the spreadsheet to validate access
+        const testSheet = SpreadsheetApp.openById(ssId);
+        const sheetName = testSheet.getName(); // This will throw if access fails
+        
+        // Show confirmation that we could access the sheet
+        ui.alert(
+          'Access Confirmed',
+          `Successfully accessed spreadsheet "${sheetName}" with ID: ${ssId}`,
+          ui.ButtonSet.OK
+        );
+      } catch (accessError) {
+        // Show warning but continue with saving
+        ui.alert(
+          'Warning',
+          `Could not verify access to the spreadsheet. Error: ${accessError.message}\n\nThe URL will still be saved, but you may need to adjust sharing permissions.`,
+          ui.ButtonSet.OK
+        );
       }
       
       // Save the URL in script properties using both property keys to ensure it works
