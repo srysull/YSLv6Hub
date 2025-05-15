@@ -4,9 +4,9 @@
  * This module provides common functions and event handlers accessible
  * to all other modules in the system.
  * 
- * @author PenBay YMCA
+ * @author Sean R. Sullivan
  * @version 2.0
- * @date 2025-04-27
+ * @date 2025-05-14
  */
 
 /**

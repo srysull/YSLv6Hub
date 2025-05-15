@@ -4,9 +4,9 @@
  * This module provides integration points for the Dynamic Instructor Sheet
  * with the rest of the YSL Hub system, including menu items and initialization.
  * 
- * @author Claude Code
+ * @author Sean R. Sullivan
  * @version 1.0
- * @date 2025-05-05
+ * @date 2025-05-14
  */
 
 /**

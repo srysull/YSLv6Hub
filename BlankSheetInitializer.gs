@@ -5,9 +5,9 @@
  * It handles the creation of all required sheets, basic formatting, and guides the user through
  * the initial configuration process.
  * 
- * @author Claude Code
+ * @author Sean R. Sullivan
  * @version 1.0
- * @date 2025-05-05
+ * @date 2025-05-14
  */
 
 /**

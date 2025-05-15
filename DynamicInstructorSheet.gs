@@ -5,9 +5,9 @@
  * sheet that updates based on class selection. It pulls student data from rosters
  * and skills data from the Swimmer Records Workbook.
  * 
- * @author Claude Code
+ * @author Sean R. Sullivan
  * @version 1.0
- * @date 2025-05-05
+ * @date 2025-05-14
  */
 
 // Configuration constants

@@ -4,9 +4,9 @@
  * This module provides validation functions for user inputs across the system.
  * It helps ensure data integrity and provides user-friendly error messages.
  * 
- * @author Claude Code
+ * @author Sean R. Sullivan
  * @version 1.0
- * @date 2025-05-05
+ * @date 2025-05-14
  */
 
 // Validation error types

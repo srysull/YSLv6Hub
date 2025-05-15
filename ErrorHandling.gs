@@ -4,9 +4,9 @@
  * This module provides centralized error handling, logging, and user-friendly
  * error messages. It maintains a system log that can be viewed for debugging.
  * 
- * @author PenBay YMCA
+ * @author Sean R. Sullivan
  * @version 1.0
- * @date 2025-04-27
+ * @date 2025-05-14
  */
 
 // Log levels and their colors for visual indication

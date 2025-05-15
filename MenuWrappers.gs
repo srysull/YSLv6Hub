@@ -5,9 +5,9 @@
  * that need to be called from the UI menu system. These functions
  * provide direct access from the menu to the actual implementation functions.
  * 
- * @author PenBay YMCA
+ * @author Sean R. Sullivan
  * @version 2.0
- * @date 2025-04-27
+ * @date 2025-05-14
  */
 
 /**
@@ -268,13 +268,49 @@ function DynamicInstructorSheet_rebuildDynamicInstructorSheet() {
 }
 
 /**
+ * User Guide Module Functions
+ */
+function UserGuide_createUserGuideSheet() {
+  if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
+    ErrorHandling.logMessage('Menu: Create User Guide', 'INFO', 'UserGuide_createUserGuideSheet');
+  }
+  return UserGuide.createUserGuideSheet();
+}
+
+/**
+ * History Module Functions
+ */
+function HistoryModule_createHistorySheet() {
+  if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
+    ErrorHandling.logMessage('Menu: View History', 'INFO', 'HistoryModule_createHistorySheet');
+  }
+  return HistoryModule.createHistorySheet();
+}
+
+/**
+ * Session Transition Module Functions
+ */
+function SessionTransitionModule_startSessionTransition() {
+  if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
+    ErrorHandling.logMessage('Menu: Start New Session', 'INFO', 'SessionTransitionModule_startSessionTransition');
+  }
+  return SessionTransitionModule.startSessionTransition();
+}
+
+function SessionTransitionModule_resumeSessionTransition() {
+  if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
+    ErrorHandling.logMessage('Menu: Resume Session Transition', 'INFO', 'SessionTransitionModule_resumeSessionTransition');
+  }
+  return SessionTransitionModule.resumeSessionTransition();
+}
+
+/**
  * Communication Module Functions for new communications features
  */
 function CommunicationModule_createCommunicationsHub() {
   if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
-    ErrorHandling.logMessage('Menu: Create Dynamic Communications Hub', 'INFO', 'CommunicationModule_createCommunicationsHub');
+    ErrorHandling.logMessage('Menu: Create Communications Hub', 'INFO', 'CommunicationModule_createCommunicationsHub');
   }
-  // Forward to the implementation, which we'll create next
   return CommunicationModule.createCommunicationsHub();
 }
 

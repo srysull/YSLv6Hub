@@ -5,8 +5,9 @@
  * Group lessons have swimmers across the top and skills down the left.
  * Private lessons have date, student name, instructor, student record, and notes columns.
  * 
- * @author PenBay YMCA
+ * @author Sean R. Sullivan
  * @version 1.3
+ * @date 2025-05-14
  */
 
 /**

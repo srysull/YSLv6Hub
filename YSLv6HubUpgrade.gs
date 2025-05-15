@@ -4,9 +4,9 @@
  * This module integrates all the enhancements and new features into the existing system.
  * It provides functions to upgrade the system and add new menu items for the enhanced features.
  * 
- * @author Claude Code
+ * @author Sean R. Sullivan
  * @version 1.0
- * @date 2025-05-05
+ * @date 2025-05-14
  */
 
 /**

@@ -5,9 +5,9 @@
  * elements for the YSL Hub system. It serves as the primary entry point for user interactions
  * and coordinates the initialization workflow.
  * 
- * @author PenBay YMCA
+ * @author Sean R. Sullivan
  * @version 2.0
- * @date 2025-04-27
+ * @date 2025-05-14
  */
 
 // Configuration property keys
@@ -77,17 +77,25 @@ function createMenu() {
         
         // 2. Communications - Enhanced communication functions
         .addSubMenu(ui.createMenu('Communications')
-              .addItem('Create Dynamic Communications Hub', 'CommunicationModule_createCommunicationsHub')
+              .addItem('Create Communications Hub', 'CommunicationModule_createCommunicationsHub')
               .addItem('Create Communication Log', 'CommunicationModule_createCommunicationLog')
-              .addSeparator()
               .addItem('Send Selected Communication', 'CommunicationModule_sendSelectedCommunication')
               .addSeparator()
               .addItem('Send Mid-Session Reports', 'ReportingModule_generateMidSessionReports')
               .addItem('Send End-Session Reports', 'ReportingModule_generateEndSessionReports')
+              .addItem('Send Welcome Emails', 'CommunicationModule_sendWelcomeEmails')
               .addItem('Send Welcome Emails', 'CommunicationModule_sendWelcomeEmails'))
         
-        // 3. System - Only the essential system configuration
-        .addItem('System Configuration', 'AdministrativeModule_showConfigurationDialog')
+        // 3. System - Essential system operations
+        .addSubMenu(ui.createMenu('System')
+              .addItem('Create User Guide', 'UserGuide_createUserGuideSheet')
+              .addSeparator()
+              .addItem('View History', 'HistoryModule_createHistorySheet')
+              .addSeparator()
+              .addItem('Start New Session', 'SessionTransitionModule_startSessionTransition')
+              .addItem('Resume Session Transition', 'SessionTransitionModule_resumeSessionTransition')
+              .addSeparator()
+              .addItem('System Configuration', 'AdministrativeModule_showConfigurationDialog'))
             .addSeparator()
             .addItem('About YSL Hub', 'AdministrativeModule_showAboutDialog');
         hasItems = true;

@@ -4,9 +4,9 @@
  * This module provides a template system for emails sent through the YSL Hub.
  * It includes predefined templates, custom template storage, and template management.
  * 
- * @author Claude Code
+ * @author Sean R. Sullivan
  * @version 1.0
- * @date 2025-05-05
+ * @date 2025-05-14
  */
 
 // Template property key prefix

@@ -5,9 +5,9 @@
  * extraction, assessment criteria synchronization, and bi-directional integration with
  * external systems such as the YSL Swimmer Log workbook.
  * 
- * @author PenBay YMCA
+ * @author Sean R. Sullivan
  * @version 2.0
- * @date 2025-04-27
+ * @date 2025-05-14
  */
 
 /**
