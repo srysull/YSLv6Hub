@@ -434,5 +434,7 @@ const GlobalFunctions = {
   formatStudentName: formatStudentName,
   findColumnIndex: findColumnIndex,
   safeGetProperty: safeGetProperty,
-  safeSetProperty: safeSetProperty
+  safeSetProperty: safeSetProperty,
+  handleClassesSheetEdit: handleClassesSheetEdit,
+  handleAnnouncementsSheetEdit: handleAnnouncementsSheetEdit
 };
