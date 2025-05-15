@@ -75,6 +75,8 @@ function createFullMenu() {
     .addItem('Create Dynamic Class Hub', 'DynamicInstructorSheet_createDynamicInstructorSheet')
     .addItem('Update with Selected Class', 'DynamicInstructorSheet_rebuildDynamicInstructorSheet')
     .addSeparator()
+    .addItem('Fix Swimmer Records Access', 'fixSwimmerRecordsAccess')
+    .addSeparator()
     .addItem('Refresh Class List', 'DataIntegrationModule_updateClassSelector')
     .addItem('Refresh Roster Data', 'DataIntegrationModule_refreshRosterData'));
     
@@ -107,6 +109,64 @@ function createFullMenu() {
     .addToUi();
     
   return menu;
+}
+
+/**
+ * Fixes Swimmer Records access issues by updating the configuration
+ * with valid spreadsheet ID
+ */
+function fixSwimmerRecordsAccess() {
+  try {
+    const ui = SpreadsheetApp.getUi();
+    
+    // Show a dialog to get the correct URL from the user
+    const result = ui.prompt(
+      'Fix Swimmer Records Configuration',
+      'Enter the URL or ID of the Swimmer Records spreadsheet:',
+      ui.ButtonSet.OK_CANCEL
+    );
+    
+    // Check if the user clicked "OK"
+    if (result.getSelectedButton() === ui.Button.OK) {
+      const userInput = result.getResponseText().trim();
+      
+      if (!userInput) {
+        ui.alert('Error', 'You must enter a URL or ID.', ui.ButtonSet.OK);
+        return;
+      }
+      
+      // Save the URL in script properties using both property keys to ensure it works
+      PropertiesService.getScriptProperties().setProperty('swimmerRecordsUrl', userInput);
+      PropertiesService.getScriptProperties().setProperty('SWIMMER_RECORDS_URL', userInput);
+      
+      // Also update it in the Assumptions sheet if it exists
+      try {
+        const ss = SpreadsheetApp.getActiveSpreadsheet();
+        const assumptionsSheet = ss.getSheetByName('Assumptions');
+        
+        if (assumptionsSheet) {
+          assumptionsSheet.getRange('B10').setValue(userInput);
+        }
+      } catch (e) {
+        Logger.log(`Error updating Assumptions sheet: ${e.message}`);
+        // Continue anyway
+      }
+      
+      // Show success message
+      ui.alert(
+        'Configuration Updated',
+        'Swimmer Records URL has been updated. Try rebuilding the instructor sheet now.',
+        ui.ButtonSet.OK
+      );
+    }
+  } catch (error) {
+    Logger.log(`Error fixing Swimmer Records access: ${error.message}`);
+    SpreadsheetApp.getUi().alert(
+      'Error',
+      `Failed to update configuration: ${error.message}`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+  }
 }
 
 /**
