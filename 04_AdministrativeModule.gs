@@ -37,33 +37,48 @@ function createMenu() {
     const ui = SpreadsheetApp.getUi();
     const menu = ui.createMenu('YSL Hub');
     
-    // Check if system is initialized
-    const isInitialized = GlobalFunctions.safeGetProperty('systemInitialized') === 'true';
+    // Check if system is initialized using both possible property keys
+    const scriptProps = PropertiesService.getScriptProperties();
+    const systemInitialized = scriptProps.getProperty('systemInitialized');
+    const configInitialized = scriptProps.getProperty('INITIALIZED');
+    
+    // Consider system initialized if either property is true
+    const isInitialized = systemInitialized === 'true' || configInitialized === 'true';
+    
+    // Log the initialization status to help with debugging
+    Logger.log(`Menu creation - systemInitialized: ${systemInitialized}, INITIALIZED: ${configInitialized}, isInitialized: ${isInitialized}`);
     
     // Check if initialization has been started but not completed
-    const sessionName = GlobalFunctions.safeGetProperty('sessionName');
+    const sessionName = scriptProps.getProperty('sessionName') || scriptProps.getProperty('SESSION_NAME');
     const hasStartedInit = sessionName && !isInitialized;
     
     // Default menu items that will always be added
     let hasItems = false;
     
-    if (!isInitialized) {
+    // TEMPORARY FIX: Always show operational menu for debugging
+    const forceOperationalMenu = true;
+    
+    if (!isInitialized && !forceOperationalMenu) {
       if (hasStartedInit) {
         // System initialization started but not completed - show Full Initialization option
-        menu.addItem('Initialize System', 'AdministrativeModule.showInitializationDialog')
-            .addItem('Full Initialization', 'AdministrativeModule.fullInitialization')
+        menu.addItem('Initialize System', 'AdministrativeModule_showInitializationDialog')
+            .addItem('Full Initialization', 'AdministrativeModule_fullInitialization')
             .addSeparator()
-            .addItem('About YSL Hub', 'AdministrativeModule.showAboutDialog');
+            .addItem('Repair Menu', 'AdministrativeModule_fixSystemInitializationProperty')
+            .addSeparator()
+            .addItem('About YSL Hub', 'AdministrativeModule_showAboutDialog');
         hasItems = true;
       } else {
         // System not initialized at all - just show initialization option
-        menu.addItem('Initialize System', 'AdministrativeModule.showInitializationDialog')
+        menu.addItem('Initialize System', 'AdministrativeModule_showInitializationDialog')
             .addSeparator()
-            .addItem('About YSL Hub', 'AdministrativeModule.showAboutDialog');
+            .addItem('Repair Menu', 'AdministrativeModule_fixSystemInitializationProperty')
+            .addSeparator()
+            .addItem('About YSL Hub', 'AdministrativeModule_showAboutDialog');
         hasItems = true;
       }
     } else {
-      // System is initialized - show operational options
+      // System is initialized or we're forcing operational menu - show operational options
       try {
         // Create a simplified menu structure with only essential operations
         
@@ -83,7 +98,6 @@ function createMenu() {
               .addSeparator()
               .addItem('Send Mid-Session Reports', 'ReportingModule_generateMidSessionReports')
               .addItem('Send End-Session Reports', 'ReportingModule_generateEndSessionReports')
-              .addItem('Send Welcome Emails', 'CommunicationModule_sendWelcomeEmails')
               .addItem('Send Welcome Emails', 'CommunicationModule_sendWelcomeEmails'))
         
         // 3. System - Essential system operations
@@ -95,7 +109,10 @@ function createMenu() {
               .addItem('Start New Session', 'SessionTransitionModule_startSessionTransition')
               .addItem('Resume Session Transition', 'SessionTransitionModule_resumeSessionTransition')
               .addSeparator()
-              .addItem('System Configuration', 'AdministrativeModule_showConfigurationDialog'))
+              .addItem('System Configuration', 'AdministrativeModule_showConfigurationDialog')
+              .addItem('Show Logs', 'ErrorHandling_showLogViewer')
+              .addSeparator()
+              .addItem('Repair Menu', 'AdministrativeModule_fixSystemInitializationProperty'))
             .addSeparator()
             .addItem('About YSL Hub', 'AdministrativeModule_showAboutDialog');
         hasItems = true;
@@ -110,6 +127,7 @@ function createMenu() {
     // If no menu items were added (which would cause an error), add fallback items
     if (!hasItems) {
       menu.addItem('System Configuration', 'AdministrativeModule_showConfigurationDialog')
+          .addItem('Repair Menu', 'AdministrativeModule_fixSystemInitializationProperty')
           .addItem('About YSL Hub', 'AdministrativeModule_showAboutDialog');
     }
     
@@ -125,6 +143,7 @@ function createMenu() {
       const ui = SpreadsheetApp.getUi();
       ui.createMenu('YSL Hub')
         .addItem('Repair System', 'AdministrativeModule_showConfigurationDialog')
+        .addItem('Repair Menu', 'AdministrativeModule_fixSystemInitializationProperty')
         .addToUi();
     } catch (finalError) {
       Logger.log(`Failed to create minimal menu: ${finalError.message}`);
@@ -876,6 +895,13 @@ function getSystemConfiguration() {
   };
 }
 
+/**
+ * Fixes system initialization property issues.
+ * This function ensures that both possible property keys for system initialization
+ * are properly set, solving menu display issues.
+ * 
+ * @return {boolean} Success status
+ */
 function fixSystemInitializationProperty() {
   try {
     // Check which property is being used
@@ -883,10 +909,18 @@ function fixSystemInitializationProperty() {
     const systemInitialized = scriptProps.getProperty('systemInitialized');
     const configInitialized = scriptProps.getProperty('INITIALIZED');
     
+    // Log current state for diagnostics
+    Logger.log(`Current initialization properties - systemInitialized: ${systemInitialized}, INITIALIZED: ${configInitialized}`);
+    
     // Set both to ensure at least one works
     if (systemInitialized === 'true' || configInitialized === 'true') {
       scriptProps.setProperty('systemInitialized', 'true');
       scriptProps.setProperty('INITIALIZED', 'true');
+      
+      // Log the action
+      if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
+        ErrorHandling.logMessage('Fixed system initialization properties', 'INFO', 'fixSystemInitializationProperty');
+      }
       
       SpreadsheetApp.getUi().alert(
         'Property Fixed',
@@ -896,6 +930,11 @@ function fixSystemInitializationProperty() {
     } else {
       scriptProps.setProperty('systemInitialized', 'true');
       scriptProps.setProperty('INITIALIZED', 'true');
+      
+      // Log the action
+      if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
+        ErrorHandling.logMessage('System manually marked as initialized', 'WARNING', 'fixSystemInitializationProperty');
+      }
       
       SpreadsheetApp.getUi().alert(
         'System Initialized',
@@ -910,6 +949,13 @@ function fixSystemInitializationProperty() {
     return true;
   } catch (error) {
     Logger.log(`Error fixing initialization property: ${error.message}`);
+    
+    // Log the error with ErrorHandling if available
+    if (ErrorHandling && typeof ErrorHandling.handleError === 'function') {
+      ErrorHandling.handleError(error, 'fixSystemInitializationProperty', 
+        'Failed to fix system initialization property. Please try again or contact support.');
+    }
+    
     SpreadsheetApp.getUi().alert(
       'Error',
       `Failed to fix initialization property: ${error.message}`,
@@ -919,7 +965,6 @@ function fixSystemInitializationProperty() {
   }
 }
 
-// Make functions available to other modules
 // Make functions available to other modules
 const AdministrativeModule = {
   createMenu: createMenu,
@@ -931,5 +976,6 @@ const AdministrativeModule = {
   showConfigurationDialog: showConfigurationDialog,
   applyConfigurationChanges: applyConfigurationChanges,
   showAboutDialog: showAboutDialog,
-  getSystemConfiguration: getSystemConfiguration
+  getSystemConfiguration: getSystemConfiguration,
+  fixSystemInitializationProperty: fixSystemInitializationProperty
 };

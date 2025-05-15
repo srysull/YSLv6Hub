@@ -329,3 +329,13 @@ function CommunicationModule_sendSelectedCommunication() {
   // Forward to the implementation, which we'll create next
   return CommunicationModule.sendSelectedCommunication();
 }
+
+/**
+ * Menu wrapper for fixing system initialization property
+ */
+function AdministrativeModule_fixSystemInitializationProperty() {
+  if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
+    ErrorHandling.logMessage('Menu: Fix System Initialization Property', 'INFO', 'AdministrativeModule_fixSystemInitializationProperty');
+  }
+  return AdministrativeModule.fixSystemInitializationProperty();
+}
