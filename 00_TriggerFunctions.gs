@@ -71,15 +71,15 @@ function createFullMenu() {
   
   var menu = ui.createMenu('YSL Hub');
   
-  // 1. Class Management section
-  menu.addSubMenu(ui.createMenu('Class Management')
-    .addItem('Create Dynamic Class Hub', 'DynamicInstructorSheet_createDynamicInstructorSheet')
-    .addItem('Update with Selected Class', 'DynamicInstructorSheet_rebuildDynamicInstructorSheet')
-    .addSeparator()
-    .addItem('Fix Swimmer Records Access', 'fixSwimmerRecordsAccess_menuWrapper')
-    .addSeparator()
-    .addItem('Refresh Class List', 'DataIntegrationModule_updateClassSelector')
-    .addItem('Refresh Roster Data', 'DataIntegrationModule_refreshRosterData'));
+  // 1. Class Management section - added directly to main menu instead of submenu
+  menu.addItem('Create Dynamic Class Hub', 'DynamicInstructorSheet_createDynamicInstructorSheet')
+      .addItem('Update Selected Class', 'DynamicInstructorSheet_rebuildDynamicInstructorSheet')
+      .addSeparator()
+      .addItem('Fix Swimmer Records Access', 'fixSwimmerRecordsAccess_menuWrapper')
+      .addSeparator()
+      .addItem('Refresh Class List', 'DataIntegrationModule_updateClassSelector')
+      .addItem('Refresh Roster Data', 'DataIntegrationModule_refreshRosterData')
+      .addSeparator();
     
   // 2. Communications section
   menu.addSubMenu(ui.createMenu('Communications')
@@ -101,6 +101,9 @@ function createFullMenu() {
     .addItem('Resume Session Transition', 'SessionTransitionModule_resumeSessionTransition')
     .addSeparator()
     .addItem('System Configuration', 'AdministrativeModule_showConfigurationDialog')
+    .addItem('Fix Swimmer Records Access', 'fixSwimmerRecordsAccess_menuWrapper')
+    .addItem('Apply Configuration Changes', 'AdministrativeModule_applyConfigurationChanges')
+    .addSeparator()
     .addItem('Show Logs', 'ErrorHandling_showLogViewer'));
     
   // Add About item and the menu to UI

@@ -681,30 +681,25 @@ function showConfigurationDialog() {
     // Activate the Assumptions sheet to show configuration
     assumptionsSheet.activate();
     
-    // Add a button for applying changes
-    let applyChangesButton = null;
-    const drawings = assumptionsSheet.getDrawings();
-    for (let i = 0; i < drawings.length; i++) {
-      if (drawings[i].getAltDescription() === 'ApplyChangesButton') {
-        applyChangesButton = drawings[i];
-        break;
-      }
-    }
-    
-    if (!applyChangesButton) {
-      // Create a text box that looks like a button
+    // Instead of trying to create a textbox which doesn't work in newer versions,
+    // just add a clear instruction in cell B15
+    try {
       const buttonCell = assumptionsSheet.getRange(15, 2);
       assumptionsSheet.setRowHeight(15, 30);
       
-      const button = assumptionsSheet.insertTextBox('Apply Configuration Changes');
-      button.setPosition(buttonCell.getRow(), buttonCell.getColumn(), 0, 0);
-      button.setWidth(200);
-      button.setHeight(30);
-      button.getText().setFontSize(12).setFontWeight('bold');
-      button.setFill('#4285F4');
-      button.getText().setForegroundColor('#FFFFFF');
-      button.setBorder(true, true, true, true, true, true, '#3367D6', null);
-      button.setAltDescription('ApplyChangesButton');
+      // Format the cell to look like a button
+      buttonCell.setValue('Click here to apply changes')
+        .setBackground('#4285F4')
+        .setFontColor('#FFFFFF')
+        .setFontWeight('bold')
+        .setHorizontalAlignment('center')
+        .setVerticalAlignment('middle');
+      
+      // Add a note with instructions
+      buttonCell.setNote('To apply your changes, select "Apply Configuration Changes" from the YSL Hub menu');
+    } catch (btnError) {
+      // Just log the error but continue
+      Logger.log(`Error creating button cell: ${btnError.message}`);
     }
     
     ui.alert(
