@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 10px;
+      }
+      .button-container {
+        margin: 20px 0;
+        text-align: center;
+      }
+      .sync-button {
+        background-color: #4285F4;
+        color: white;
+        border: none;
+        padding: 12px 25px;
+        border-radius: 4px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+      .sync-button:hover {
+        background-color: #2a75f3;
+      }
+      .title {
+        text-align: center;
+        color: #333;
+        margin-bottom: 20px;
+      }
+      .description {
+        margin-bottom: 20px;
+        color: #666;
+      }
+      .footer {
+        margin-top: 30px;
+        font-size: 12px;
+        color: #999;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <h2 class="title">YSL v6 Hub Data Sync</h2>
+    
+    <div class="description">
+      <p>Sync student data between Group Lesson Tracker and SwimmerSkills sheets.</p>
+      <p>For best results, open the Group Lesson Tracker sheet before clicking sync.</p>
+    </div>
+    
+    <div class="button-container">
+      <button class="sync-button" onclick="runSync()">SYNC DATA</button>
+    </div>
+    
+    <div id="status"></div>
+    
+    <div class="footer">
+      <p>YSL v6 Hub © 2025</p>
+    </div>
+    
+    <script>
+      // Function to run the sync operation
+      function runSync() {
+        // Update status
+        document.getElementById('status').innerHTML = "<p style='color:#777;'>Syncing data...</p>";
+        
+        // Call the server-side function
+        google.script.run
+          .withSuccessHandler(onSuccess)
+          .withFailureHandler(onFailure)
+          .runSyncOperation();
+      }
+      
+      // Success handler
+      function onSuccess(result) {
+        document.getElementById('status').innerHTML = 
+          "<p style='color:green;'>" + result + "</p>";
+      }
+      
+      // Failure handler
+      function onFailure(error) {
+        document.getElementById('status').innerHTML = 
+          "<p style='color:red;'>Error: " + error.message + "</p>";
+      }
+    </script>
+  </body>
+</html>

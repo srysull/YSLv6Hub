@@ -125,10 +125,20 @@ function fixMenu() {
     // Create the full menu
     createFullMenu();
     
+    // Separately create the Sync menu to ensure it's available
+    if (typeof createSyncMenu === 'function') {
+      createSyncMenu();
+    } else {
+      // Fallback if createSyncMenu is not available
+      ui.createMenu('Sync')
+        .addItem('Sync Student Data', 'YSL_SYNC_STUDENT_DATA')
+        .addToUi();
+    }
+    
     // Show confirmation
     ui.alert(
       'Menu Fixed',
-      'System properties have been reset and menu has been created.',
+      'System properties have been reset and all menus have been created.',
       ui.ButtonSet.OK
     );
     
@@ -136,6 +146,95 @@ function fixMenu() {
   } catch (error) {
     Logger.log('Error fixing menu: ' + error.message);
     SpreadsheetApp.getUi().alert('Error: ' + error.message);
+    return false;
+  }
+}
+
+/**
+ * Force recreate both main and Sync menus
+ * This can be used to restore menus after an update
+ */
+function reloadAllMenus() {
+  try {
+    const ui = SpreadsheetApp.getUi();
+    
+    // Clear existing UI menus (not possible in GAS, but we'll recreate them)
+    
+    // Create the full main menu
+    createFullMenu();
+    
+    // Separately create the Sync menu to ensure it's available
+    if (typeof createSyncMenu === 'function') {
+      createSyncMenu();
+    } else {
+      // Fallback if createSyncMenu is not available
+      ui.createMenu('Sync')
+        .addItem('Sync Student Data', 'YSL_SYNC_STUDENT_DATA')
+        .addToUi();
+    }
+    
+    // Show confirmation
+    ui.alert(
+      'Menus Reloaded',
+      'All menus have been recreated. Please check that both the YSL v6 Hub and Sync menus appear in the menu bar.',
+      ui.ButtonSet.OK
+    );
+    
+    return true;
+  } catch (error) {
+    Logger.log('Error reloading menus: ' + error.message);
+    SpreadsheetApp.getUi().alert('Error: ' + error.message);
+    return false;
+  }
+}
+
+/**
+ * Special function to install an onOpen trigger
+ * This function can be run from the Script Editor to install a trigger
+ * that will run the onOpen function when the spreadsheet is opened
+ */
+function installOnOpenTrigger() {
+  try {
+    // Delete any existing onOpen triggers to avoid duplication
+    const triggers = ScriptApp.getProjectTriggers();
+    for (let i = 0; i < triggers.length; i++) {
+      if (triggers[i].getHandlerFunction() === 'onOpen') {
+        ScriptApp.deleteTrigger(triggers[i]);
+      }
+    }
+    
+    // Create a new trigger for onOpen
+    ScriptApp.newTrigger('onOpen')
+      .forSpreadsheet(SpreadsheetApp.getActive())
+      .onOpen()
+      .create();
+    
+    Logger.log('Successfully installed onOpen trigger');
+    return true;
+  } catch (error) {
+    Logger.log('Error installing onOpen trigger: ' + error.message);
+    return false;
+  }
+}
+
+/**
+ * Function to create an example menu item that rebuilds menus
+ * This can be run safely from the Script Editor
+ */
+function createSimpleRepairMenu() {
+  try {
+    // This function can be run from the Script Editor
+    const ui = SpreadsheetApp.getUi();
+    
+    // Create a very minimal menu with just one repair function
+    ui.createMenu('Menu Repair')
+      .addItem('Fix All Menus', 'fixMenu')
+      .addToUi();
+    
+    Logger.log('Created simple repair menu');
+    return true;
+  } catch (error) {
+    Logger.log('Error creating simple repair menu: ' + error.message);
     return false;
   }
 }
@@ -150,7 +249,7 @@ function createFullMenu() {
   
   // 1. Class Management section - added directly to main menu instead of submenu
   menu.addItem('Generate Group Lesson Tracker', 'DynamicInstructorSheet_createDynamicInstructorSheet')
-      .addItem('◉ SYNC STUDENT DATA ◉', 'syncSwimmerData_menuWrapper')
+      .addItem('◉ SYNC STUDENT DATA ◉', 'YSL_SYNC_STUDENT_DATA')
       .addSeparator()
       .addItem('Refresh Class List', 'DataIntegrationModule_updateClassSelector')
       .addItem('Refresh Roster Data', 'DataIntegrationModule_refreshRosterData')
