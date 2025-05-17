@@ -18,6 +18,18 @@ function onOpen() {
     // Try to create the full menu first
     createFullMenu();
     
+    // Call the special sync menu creator from SyncMenu.gs
+    // This is a separate function to ensure it's always available
+    if (typeof createSyncMenu === 'function') {
+      createSyncMenu();
+    } else {
+      // Fallback if createSyncMenu is not available
+      const ui = SpreadsheetApp.getUi();
+      ui.createMenu('Sync')
+        .addItem('Sync Student Data', 'syncSwimmerData_menuWrapper')
+        .addToUi();
+    }
+    
     // Log successful menu creation
     Logger.log('Full menu created in onOpen trigger');
   } catch (error) {
@@ -25,14 +37,77 @@ function onOpen() {
     Logger.log('Error creating full menu: ' + error.message);
     
     const ui = SpreadsheetApp.getUi();
-    ui.createMenu('YSL Hub')
+    ui.createMenu('YSL v6 Hub')
       .addItem('Initialize System', 'AdministrativeModule_showInitializationDialog')
       .addItem('Fix Swimmer Records Access', 'fixSwimmerRecordsAccess_menuWrapper')
       .addItem('Fix Menu', 'fixMenu')
-      .addItem('About YSL Hub', 'AdministrativeModule_showAboutDialog')
+      .addItem('About YSL v6 Hub', 'AdministrativeModule_showAboutDialog')
       .addToUi();
       
+    // Always try to create the sync menu even if the main menu fails
+    try {
+      if (typeof createSyncMenu === 'function') {
+        createSyncMenu();
+      } else {
+        // Fallback if createSyncMenu is not available
+        ui.createMenu('Sync')
+          .addItem('Sync Student Data', 'syncSwimmerData_menuWrapper')
+          .addToUi();
+      }
+    } catch (syncMenuError) {
+      Logger.log('Error creating sync menu: ' + syncMenuError.message);
+    }
+    
     Logger.log('Fallback menu created');
+  }
+}
+
+/**
+ * Direct function to sync student data between Group Lesson Tracker and SwimmerSkills sheets
+ * This is a global function called directly from the menu
+ */
+function directSyncStudentData() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getActiveSheet();
+    
+    // Check if we're on the Group Lesson Tracker sheet
+    if (sheet.getName() !== 'Group Lesson Tracker') {
+      const ui = SpreadsheetApp.getUi();
+      const result = ui.alert(
+        'Switch to Group Lesson Tracker?',
+        'This function should be run from the Group Lesson Tracker sheet. Would you like to switch to that sheet now?',
+        ui.ButtonSet.YES_NO
+      );
+      
+      if (result === ui.Button.YES) {
+        // Try to find and activate the Group Lesson Tracker sheet
+        const trackerSheet = ss.getSheetByName('Group Lesson Tracker');
+        if (trackerSheet) {
+          trackerSheet.activate();
+          // Call sync function directly with the tracker sheet
+          if (typeof GlobalFunctions !== 'undefined' && 
+              typeof GlobalFunctions.syncStudentDataWithSwimmerSkills === 'function') {
+            GlobalFunctions.syncStudentDataWithSwimmerSkills(trackerSheet);
+          } else {
+            ui.alert('Error', 'Sync function not available. Please contact the administrator.', ui.ButtonSet.OK);
+          }
+        } else {
+          ui.alert('Error', 'Could not find the Group Lesson Tracker sheet. Please create it first.', ui.ButtonSet.OK);
+        }
+      }
+    } else {
+      // We're already on the Group Lesson Tracker sheet
+      if (typeof GlobalFunctions !== 'undefined' && 
+          typeof GlobalFunctions.syncStudentDataWithSwimmerSkills === 'function') {
+        GlobalFunctions.syncStudentDataWithSwimmerSkills(sheet);
+      } else {
+        SpreadsheetApp.getUi().alert('Error', 'Sync function not available. Please contact the administrator.', SpreadsheetApp.getUi().ButtonSet.OK);
+      }
+    }
+  } catch (error) {
+    Logger.log(`Error in directSyncStudentData: ${error.message}`);
+    SpreadsheetApp.getUi().alert('Error', `Failed to sync student data: ${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }
 
@@ -71,10 +146,11 @@ function fixMenu() {
 function createFullMenu() {
   const ui = SpreadsheetApp.getUi();
   
-  const menu = ui.createMenu('YSL Hub');
+  const menu = ui.createMenu('YSL v6 Hub');
   
   // 1. Class Management section - added directly to main menu instead of submenu
   menu.addItem('Generate Group Lesson Tracker', 'DynamicInstructorSheet_createDynamicInstructorSheet')
+      .addItem('◉ SYNC STUDENT DATA ◉', 'syncSwimmerData_menuWrapper')
       .addSeparator()
       .addItem('Refresh Class List', 'DataIntegrationModule_updateClassSelector')
       .addItem('Refresh Roster Data', 'DataIntegrationModule_refreshRosterData')
@@ -107,7 +183,7 @@ function createFullMenu() {
     
   // Add About item and the menu to UI
   menu.addSeparator()
-    .addItem('About YSL Hub', 'AdministrativeModule_showAboutDialog')
+    .addItem('About YSL v6 Hub', 'AdministrativeModule_showAboutDialog')
     .addToUi();
     
   return menu;
@@ -204,6 +280,7 @@ function fixSwimmerRecordsAccess() {
     );
   }
 }
+
 
 /**
  * Global onEdit trigger function
