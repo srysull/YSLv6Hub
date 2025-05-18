@@ -34,9 +34,8 @@ function onOpen() {
     PropertiesService.getScriptProperties().setProperty(MENU_CONFIG.properties.initialized, 'true');
     PropertiesService.getScriptProperties().setProperty('INITIALIZED', 'true');
     
-    // Create menus
+    // Create main menu only
     createMainMenu();
-    createUtilityMenus();
     
     Logger.log('Menu creation completed successfully');
   } catch (error) {
@@ -59,7 +58,7 @@ function createMainMenu() {
   
   // Class Management
   menu.addItem('Generate Group Lesson Tracker', 'DynamicInstructorSheet_createDynamicInstructorSheet')
-      .addItem('◉ SYNC STUDENT DATA ◉', 'directSyncStudentData')
+      .addItem('Sync Student Data', 'directSyncStudentData')
       .addSeparator()
       .addItem('Refresh Class List', 'DataIntegrationModule_updateClassSelector')
       .addItem('Refresh Roster Data', 'DataIntegrationModule_refreshRosterData')
@@ -101,6 +100,7 @@ function createMainMenu() {
     .addSeparator()
     .addItem('Repair System', 'DebugModule_repairSystem')
     .addItem('Fix Menu', 'fixMenuSystem')
+    .addItem('Run Menu Diagnostics', 'runMenuDiagnostics')
     .addSeparator()
     .addItem('Clear System Cache', 'VersionControl_clearCache')
     .addItem('Test Menu Creation', 'testMenuCreation'));
@@ -113,20 +113,11 @@ function createMainMenu() {
 
 /**
  * Creates utility menus for quick access to important functions
+ * Now empty - all functionality moved to main menu
  */
 function createUtilityMenus() {
-  const ui = SpreadsheetApp.getUi();
-  
-  // Sync menu for quick access
-  ui.createMenu('Sync')
-    .addItem('Sync Student Data', 'directSyncStudentData')
-    .addToUi();
-  
-  // Emergency menu with critical functions
-  ui.createMenu('Emergency')
-    .addItem('Fix Menu System', 'fixMenuSystem')
-    .addItem('Run Menu Diagnostics', 'runMenuDiagnostics')
-    .addToUi();
+  // No additional menus - all functionality is in the main menu
+  // This function is kept for backward compatibility
 }
 
 /**
@@ -134,7 +125,7 @@ function createUtilityMenus() {
  */
 function createEmergencyMenu() {
   const ui = SpreadsheetApp.getUi();
-  ui.createMenu('EMERGENCY REPAIR')
+  ui.createMenu('Menu Repair')
     .addItem('Fix Menu System', 'fixMenuSystem')
     .addToUi();
 }
@@ -150,9 +141,8 @@ function fixMenuSystem() {
   // Fix triggers by ensuring only one onOpen trigger exists
   fixTriggers();
   
-  // Create all menus
+  // Create main menu only
   createMainMenu();
-  createUtilityMenus();
   
   // Show confirmation
   SpreadsheetApp.getUi().alert(
