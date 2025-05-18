@@ -28,20 +28,9 @@ const COMMUNICATION_SHEETS = {
 };
 
 // Email template placeholders
-const PLACEHOLDERS = {
-  STUDENT_NAME: '{{student_name}}',
-  PARENT_NAME: '{{parent_name}}',
-  CLASS_NAME: '{{class_name}}',
-  INSTRUCTOR_NAME: '{{instructor_name}}',
-  DAY: '{{day}}',
-  TIME: '{{time}}',
-  LOCATION: '{{location}}',
-  START_DATE: '{{start_date}}',
-  END_DATE: '{{end_date}}',
-  SESSION_NAME: '{{session_name}}',
-  LEVEL: '{{level}}',
-  NEXT_LEVEL: '{{next_level}}'
-};
+// Using shared placeholders from 18_PlaceholdersConstants.ts
+// Local reference for better readability
+const COMMUNICATION_PLACEHOLDERS = SHARED_PLACEHOLDERS;
 
 /**
  * Creates a communications hub sheet for managing communications
@@ -814,25 +803,25 @@ function personalizeText(text, recipient, classDetails, sessionName) {
   
   // Replace recipient placeholders
   if (recipient) {
-    result = result.replace(new RegExp(PLACEHOLDERS.STUDENT_NAME, 'g'), recipient.student_name || '');
-    result = result.replace(new RegExp(PLACEHOLDERS.PARENT_NAME, 'g'), recipient.parent_name || '');
-    result = result.replace(new RegExp(PLACEHOLDERS.LEVEL, 'g'), recipient.level || '');
-    result = result.replace(new RegExp(PLACEHOLDERS.NEXT_LEVEL, 'g'), recipient.next_level || '');
+    result = result.replace(new RegExp(COMMUNICATION_PLACEHOLDERS.STUDENT_NAME, 'g'), recipient.student_name || '');
+    result = result.replace(new RegExp(COMMUNICATION_PLACEHOLDERS.PARENT_NAME, 'g'), recipient.parent_name || '');
+    result = result.replace(new RegExp(COMMUNICATION_PLACEHOLDERS.LEVEL, 'g'), recipient.level || '');
+    result = result.replace(new RegExp(COMMUNICATION_PLACEHOLDERS.NEXT_LEVEL, 'g'), recipient.next_level || '');
   }
   
   // Replace class placeholders
   if (classDetails) {
-    result = result.replace(new RegExp(PLACEHOLDERS.CLASS_NAME, 'g'), classDetails.class_name || '');
-    result = result.replace(new RegExp(PLACEHOLDERS.INSTRUCTOR_NAME, 'g'), classDetails.instructor_name || '');
-    result = result.replace(new RegExp(PLACEHOLDERS.DAY, 'g'), classDetails.day || '');
-    result = result.replace(new RegExp(PLACEHOLDERS.TIME, 'g'), classDetails.time || '');
-    result = result.replace(new RegExp(PLACEHOLDERS.LOCATION, 'g'), classDetails.location || '');
-    result = result.replace(new RegExp(PLACEHOLDERS.START_DATE, 'g'), classDetails.start_date || '');
-    result = result.replace(new RegExp(PLACEHOLDERS.END_DATE, 'g'), classDetails.end_date || '');
+    result = result.replace(new RegExp(COMMUNICATION_PLACEHOLDERS.CLASS_NAME, 'g'), classDetails.class_name || '');
+    result = result.replace(new RegExp(COMMUNICATION_PLACEHOLDERS.INSTRUCTOR_NAME, 'g'), classDetails.instructor_name || '');
+    result = result.replace(new RegExp(COMMUNICATION_PLACEHOLDERS.DAY, 'g'), classDetails.day || '');
+    result = result.replace(new RegExp(COMMUNICATION_PLACEHOLDERS.TIME, 'g'), classDetails.time || '');
+    result = result.replace(new RegExp(COMMUNICATION_PLACEHOLDERS.LOCATION, 'g'), classDetails.location || '');
+    result = result.replace(new RegExp(COMMUNICATION_PLACEHOLDERS.START_DATE, 'g'), classDetails.start_date || '');
+    result = result.replace(new RegExp(COMMUNICATION_PLACEHOLDERS.END_DATE, 'g'), classDetails.end_date || '');
   }
   
   // Replace session name
-  result = result.replace(new RegExp(PLACEHOLDERS.SESSION_NAME, 'g'), sessionName || '');
+  result = result.replace(new RegExp(COMMUNICATION_PLACEHOLDERS.SESSION_NAME, 'g'), sessionName || '');
   
   return result;
 }

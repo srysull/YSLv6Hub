@@ -1,93 +1,13 @@
 /**
  * YSL Hub v2 Trigger Functions
  * 
- * This file contains the global trigger functions that Google Apps Script
- * automatically executes in response to events.
+ * This file contains additional trigger functions for Google Apps Script.
+ * The main onOpen trigger is now in 00_MenuSystem.ts.
  * 
  * @author Sean R. Sullivan
  * @version 2.0
- * @date 2025-05-14
+ * @date 2025-05-18
  */
-
-/**
- * Global onOpen trigger function
- * Executed automatically when the spreadsheet is opened
- */
-function onOpen() {
-  try {
-    Logger.log('onOpen trigger function started from 00_TriggerFunctions.ts');
-    
-    // Force properties to true to ensure menu appears
-    PropertiesService.getScriptProperties().setProperty('systemInitialized', 'true');
-    PropertiesService.getScriptProperties().setProperty('INITIALIZED', 'true');
-    
-    // Call fixed menu creation first to guarantee a menu appears
-    if (typeof createFixedMenu === 'function') {
-      Logger.log('Calling createFixedMenu from MenuFix.gs');
-      createFixedMenu();
-      Logger.log('createFixedMenu completed successfully');
-      return; // Exit early if fixed menu was created
-    }
-    
-    // If createFixedMenu is not available, fall back to standard menu creation
-    Logger.log('createFixedMenu not found, using standard menu creation');
-    
-    // Create the full menu
-    createFullMenu();
-    
-    // Call the special sync menu creator from SyncMenu.gs
-    // This is a separate function to ensure it's always available
-    if (typeof createSyncMenu === 'function') {
-      createSyncMenu();
-    } else {
-      // Fallback if createSyncMenu is not available
-      const ui = SpreadsheetApp.getUi();
-      ui.createMenu('Sync')
-        .addItem('Sync Student Data', 'directSyncStudentData')
-        .addToUi();
-    }
-    
-    // Create an additional emergency repair menu for troubleshooting
-    const ui = SpreadsheetApp.getUi();
-    ui.createMenu('Emergency Menu')
-      .addItem('Fix Menu', 'completeMenuFix')
-      .addItem('Install Trigger', 'fixTriggers')
-      .addItem('Reload All Menus', 'reloadAllMenus')
-      .addToUi();
-    
-    // Log successful menu creation
-    Logger.log('Full menu created in onOpen trigger');
-  } catch (error) {
-    // If full menu fails, create a simple fallback menu
-    Logger.log('Error creating full menu: ' + error.message);
-    
-    const ui = SpreadsheetApp.getUi();
-    ui.createMenu('YSL v6 Hub')
-      .addItem('Initialize System', 'AdministrativeModule_showInitializationDialog')
-      .addItem('Fix Swimmer Records Access', 'fixSwimmerRecordsAccess_menuWrapper')
-      .addItem('Fix Menu', 'fixMenu')
-      .addItem('Install Trigger', 'installOnOpenTrigger')
-      .addItem('Reload All Menus', 'reloadAllMenus')
-      .addItem('About YSL v6 Hub', 'AdministrativeModule_showAboutDialog')
-      .addToUi();
-      
-    // Always try to create the sync menu even if the main menu fails
-    try {
-      if (typeof createSyncMenu === 'function') {
-        createSyncMenu();
-      } else {
-        // Fallback if createSyncMenu is not available
-        ui.createMenu('Sync')
-          .addItem('Sync Student Data', 'YSL_SYNC_STUDENT_DATA')
-          .addToUi();
-      }
-    } catch (syncMenuError) {
-      Logger.log('Error creating sync menu: ' + syncMenuError.message);
-    }
-    
-    Logger.log('Fallback menu created');
-  }
-}
 
 /**
  * Direct function to sync student data between Group Lesson Tracker and SwimmerSkills sheets
@@ -140,8 +60,14 @@ function directSyncStudentData() {
 
 /**
  * Emergency function to fix menu issues
+ * Redirects to the new central menu system's fixMenuSystem function
  */
 function fixMenu() {
+  // Call the new central menu system's fixMenuSystem function if available
+  if (typeof fixMenuSystem === 'function') {
+    return fixMenuSystem();
+  }
+  
   try {
     const ui = SpreadsheetApp.getUi();
     
@@ -149,18 +75,8 @@ function fixMenu() {
     PropertiesService.getScriptProperties().setProperty('systemInitialized', 'true');
     PropertiesService.getScriptProperties().setProperty('INITIALIZED', 'true');
     
-    // Create the full menu
-    createFullMenu();
-    
-    // Separately create the Sync menu to ensure it's available
-    if (typeof createSyncMenu === 'function') {
-      createSyncMenu();
-    } else {
-      // Fallback if createSyncMenu is not available
-      ui.createMenu('Sync')
-        .addItem('Sync Student Data', 'YSL_SYNC_STUDENT_DATA')
-        .addToUi();
-    }
+    // Call the new onOpen function from 00_MenuSystem.ts
+    onOpen();
     
     // Show confirmation
     ui.alert(
@@ -180,31 +96,36 @@ function fixMenu() {
 /**
  * Force recreate both main and Sync menus
  * This can be used to restore menus after an update
+ * Now redirects to the new central menu system
  */
 function reloadAllMenus() {
-  try {
-    const ui = SpreadsheetApp.getUi();
-    
-    // Clear existing UI menus (not possible in GAS, but we'll recreate them)
-    
-    // Create the full main menu
-    createFullMenu();
-    
-    // Separately create the Sync menu to ensure it's available
-    if (typeof createSyncMenu === 'function') {
-      createSyncMenu();
-    } else {
-      // Fallback if createSyncMenu is not available
-      ui.createMenu('Sync')
-        .addItem('Sync Student Data', 'YSL_SYNC_STUDENT_DATA')
-        .addToUi();
+  // Call the new central menu system's functions if available
+  if (typeof createMainMenu === 'function' && typeof createUtilityMenus === 'function') {
+    try {
+      createMainMenu();
+      createUtilityMenus();
+      
+      SpreadsheetApp.getUi().alert(
+        'Menus Reloaded',
+        'All menus have been recreated using the new menu system.',
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+      
+      return true;
+    } catch (error) {
+      Logger.log('Error using new menu system: ' + error.message);
     }
+  }
+  
+  // Fallback to old method
+  try {
+    // Call the new onOpen function from 00_MenuSystem.ts
+    onOpen();
     
-    // Show confirmation
-    ui.alert(
+    SpreadsheetApp.getUi().alert(
       'Menus Reloaded',
-      'All menus have been recreated. Please check that both the YSL v6 Hub and Sync menus appear in the menu bar.',
-      ui.ButtonSet.OK
+      'All menus have been recreated. Please check that both the YSL v6 Hub and utility menus appear in the menu bar.',
+      SpreadsheetApp.getUi().ButtonSet.OK
     );
     
     return true;
@@ -219,8 +140,14 @@ function reloadAllMenus() {
  * Special function to install an onOpen trigger
  * This function can be run from the Script Editor to install a trigger
  * that will run the onOpen function when the spreadsheet is opened
+ * Now redirects to the new central menu system's fixTriggers function
  */
 function installOnOpenTrigger() {
+  // Call the new central menu system's fixTriggers function if available
+  if (typeof fixTriggers === 'function') {
+    return fixTriggers();
+  }
+  
   try {
     // Delete any existing onOpen triggers to avoid duplication
     const triggers = ScriptApp.getProjectTriggers();
@@ -255,7 +182,7 @@ function createSimpleRepairMenu() {
     
     // Create a very minimal menu with just one repair function
     ui.createMenu('Menu Repair')
-      .addItem('Fix All Menus', 'fixMenu')
+      .addItem('Fix Menu System', 'fixMenuSystem') // Use the new function name
       .addToUi();
     
     Logger.log('Created simple repair menu');
@@ -268,15 +195,23 @@ function createSimpleRepairMenu() {
 
 /**
  * Creates the full operational menu directly
+ * This is now deprecated - the menu creation is handled by 00_MenuSystem.ts
+ * This remains here for backward compatibility
  */
 function createFullMenu() {
+  // Call the new createMainMenu function from 00_MenuSystem.ts if available
+  if (typeof createMainMenu === 'function') {
+    return createMainMenu();
+  }
+  
+  // Fallback to old implementation
   const ui = SpreadsheetApp.getUi();
   
   const menu = ui.createMenu('YSL v6 Hub');
   
   // 1. Class Management section - added directly to main menu instead of submenu
   menu.addItem('Generate Group Lesson Tracker', 'DynamicInstructorSheet_createDynamicInstructorSheet')
-      .addItem('◉ SYNC STUDENT DATA ◉', 'YSL_SYNC_STUDENT_DATA')
+      .addItem('◉ SYNC STUDENT DATA ◉', 'directSyncStudentData') // Updated function reference
       .addSeparator()
       .addItem('Refresh Class List', 'DataIntegrationModule_updateClassSelector')
       .addItem('Refresh Roster Data', 'DataIntegrationModule_refreshRosterData')
@@ -305,7 +240,7 @@ function createFullMenu() {
     .addItem('Resume Session Transition', 'SessionTransitionModule_resumeSessionTransition')
     .addSeparator()
     .addItem('System Configuration', 'AdministrativeModule_showConfigurationDialog')
-    .addItem('Fix Swimmer Records Access', 'fixSwimmerRecordsAccess_menuWrapper')
+    .addItem('Fix Swimmer Records Access', 'fixSwimmerRecordsAccess')
     .addItem('Apply Configuration Changes', 'AdministrativeModule_applyConfigurationChanges')
     .addSeparator()
     .addItem('Show Logs', 'ErrorHandling_showLogViewer')
@@ -317,12 +252,12 @@ function createFullMenu() {
     .addItem('System Diagnostics', 'VersionControl_showDiagnostics')
     .addSeparator()
     .addItem('Repair System', 'DebugModule_repairSystem')
-    .addItem('Fix Menu', 'fixMenu')
+    .addItem('Fix Menu', 'fixMenuSystem') // Updated function reference
     .addItem('Reload All Menus', 'reloadAllMenus')
-    .addItem('Install Trigger', 'installOnOpenTrigger')
+    .addItem('Install Trigger', 'fixTriggers') // Updated function reference
     .addSeparator()
     .addItem('Clear System Cache', 'VersionControl_clearCache')
-    .addItem('Test Menu Creation', 'DebugModule_testMenuCreation'));
+    .addItem('Test Menu Creation', 'testMenuCreation')); // Updated function reference
     
   // Add About item and the menu to UI
   menu.addSeparator()

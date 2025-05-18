@@ -17,22 +17,9 @@ const REPORT_TYPES = {
 };
 
 // Placeholder patterns for report templates
-const PLACEHOLDERS = {
-  STUDENT_NAME: '{{student_name}}',
-  STUDENT_ID: '{{student_id}}',
-  CLASS_NAME: '{{class_name}}',
-  LEVEL: '{{level}}',
-  INSTRUCTOR_NAME: '{{instructor_name}}',
-  SESSION_NAME: '{{session_name}}',
-  REPORT_DATE: '{{report_date}}',
-  PARENT_NAME: '{{parent_name}}',
-  SKILLS_TABLE: '{{skills_table}}',
-  COMMENTS: '{{comments}}',
-  NEXT_STEPS: '{{next_steps}}',
-  ASSESSMENT_SUMMARY: '{{assessment_summary}}',
-  NEXT_LEVEL: '{{next_level}}',
-  RECOMMENDED_CLASSES: '{{recommended_classes}}'
-};
+// Using shared placeholders from 18_PlaceholdersConstants.ts
+// Local reference for better readability
+const REPORT_PLACEHOLDERS = SHARED_PLACEHOLDERS;
 
 /**
  * Generates mid-session progress reports for selected classes
@@ -406,11 +393,11 @@ function generateEndSessionReports() {
           
           // Add assessment summary
           const summary = generateAssessmentSummary(student);
-          body.replaceText(PLACEHOLDERS.ASSESSMENT_SUMMARY, summary);
+          body.replaceText(REPORT_PLACEHOLDERS.ASSESSMENT_SUMMARY, summary);
           
           // Add recommended classes for next session
           const recommendations = generateRecommendations(student, nextLevel);
-          body.replaceText(PLACEHOLDERS.RECOMMENDED_CLASSES, recommendations);
+          body.replaceText(REPORT_PLACEHOLDERS.RECOMMENDED_CLASSES, recommendations);
           
           // Save and close
           doc.saveAndClose();
@@ -936,18 +923,18 @@ function getStudentsWithAssessments(classId) {
 function replacePlaceholders(body, student, classDetails, sessionName, nextLevel = '') {
   try {
     // Basic replacements
-    body.replaceText(PLACEHOLDERS.STUDENT_NAME, `${student.firstName} ${student.lastName}`);
-    body.replaceText(PLACEHOLDERS.STUDENT_ID, student.studentId);
-    body.replaceText(PLACEHOLDERS.CLASS_NAME, classDetails.className);
-    body.replaceText(PLACEHOLDERS.LEVEL, student.level || classDetails.level);
-    body.replaceText(PLACEHOLDERS.INSTRUCTOR_NAME, classDetails.instructor);
-    body.replaceText(PLACEHOLDERS.SESSION_NAME, sessionName);
-    body.replaceText(PLACEHOLDERS.REPORT_DATE, Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MMMM d, yyyy'));
-    body.replaceText(PLACEHOLDERS.PARENT_NAME, 'Parent/Guardian');
+    body.replaceText(REPORT_PLACEHOLDERS.STUDENT_NAME, `${student.firstName} ${student.lastName}`);
+    body.replaceText(REPORT_PLACEHOLDERS.STUDENT_ID, student.studentId);
+    body.replaceText(REPORT_PLACEHOLDERS.CLASS_NAME, classDetails.className);
+    body.replaceText(REPORT_PLACEHOLDERS.LEVEL, student.level || classDetails.level);
+    body.replaceText(REPORT_PLACEHOLDERS.INSTRUCTOR_NAME, classDetails.instructor);
+    body.replaceText(REPORT_PLACEHOLDERS.SESSION_NAME, sessionName);
+    body.replaceText(REPORT_PLACEHOLDERS.REPORT_DATE, Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MMMM d, yyyy'));
+    body.replaceText(REPORT_PLACEHOLDERS.PARENT_NAME, 'Parent/Guardian');
     
     // Replace next level if provided
     if (nextLevel) {
-      body.replaceText(PLACEHOLDERS.NEXT_LEVEL, nextLevel);
+      body.replaceText(REPORT_PLACEHOLDERS.NEXT_LEVEL, nextLevel);
     }
     
     // Create skills table
@@ -960,10 +947,10 @@ function replacePlaceholders(body, student, classDetails, sessionName, nextLevel
       }
     }
     
-    body.replaceText(PLACEHOLDERS.SKILLS_TABLE, skillsTable);
+    body.replaceText(REPORT_PLACEHOLDERS.SKILLS_TABLE, skillsTable);
     
     // Replace comments with notes
-    body.replaceText(PLACEHOLDERS.COMMENTS, student.notes || 'No additional comments.');
+    body.replaceText(REPORT_PLACEHOLDERS.COMMENTS, student.notes || 'No additional comments.');
     
     // Next steps depends on assessment data
     let nextSteps = '';
@@ -984,7 +971,7 @@ function replacePlaceholders(body, student, classDetails, sessionName, nextLevel
       }
     }
     
-    body.replaceText(PLACEHOLDERS.NEXT_STEPS, nextSteps);
+    body.replaceText(REPORT_PLACEHOLDERS.NEXT_STEPS, nextSteps);
   } catch (error) {
     Logger.log(`Error replacing placeholders: ${error.message}`);
     throw error;
