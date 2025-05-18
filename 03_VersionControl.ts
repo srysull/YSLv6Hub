@@ -294,6 +294,42 @@ function logMessage(message, level = 'INFO') {
   }
 }
 
+/**
+ * Clears system cache to help resolve issues
+ * 
+ * @returns Success status
+ */
+function clearCache() {
+  // Use VersionControlActions if available
+  if (typeof VersionControlActions !== 'undefined' && 
+      typeof VersionControlActions.clearSystemCache === 'function') {
+    return VersionControlActions.clearSystemCache();
+  }
+  
+  // Fallback implementation
+  const scriptProps = PropertiesService.getScriptProperties();
+  const cacheProps = [
+    'lastRosterSync',
+    'lastAssessmentSync',
+    'cachedClassData',
+    'cachedRosterData',
+    'cachedInstructorData'
+  ];
+  
+  for (const prop of cacheProps) {
+    scriptProps.deleteProperty(prop);
+  }
+  
+  logMessage('System cache cleared manually', 'INFO');
+  
+  SpreadsheetApp.getUi().alert(
+    'Cache Cleared',
+    'Basic cache clearing completed. Some cached data may remain.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+  return true;
+}
+
 // Global variable export
 const VersionControl = {
   initializeVersionControl,
@@ -303,5 +339,6 @@ const VersionControl = {
   showVersionInfo,
   checkForUpdates,
   runDiagnostics,
-  showDiagnostics
+  showDiagnostics,
+  clearCache
 };

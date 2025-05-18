@@ -253,6 +253,7 @@ function createFullMenu() {
       .addSeparator()
       .addItem('Refresh Class List', 'DataIntegrationModule_updateClassSelector')
       .addItem('Refresh Roster Data', 'DataIntegrationModule_refreshRosterData')
+      .addItem('Generate Instructor Sheets', 'InstructorResourceModule_generateInstructorSheets')
       .addSeparator();
     
   // 2. Communications section
@@ -263,7 +264,9 @@ function createFullMenu() {
     .addSeparator()
     .addItem('Send Mid-Session Reports', 'ReportingModule_generateMidSessionReports')
     .addItem('Send End-Session Reports', 'ReportingModule_generateEndSessionReports')
-    .addItem('Send Welcome Emails', 'CommunicationModule_sendWelcomeEmails'));
+    .addSeparator()
+    .addItem('Send Welcome Emails', 'CommunicationModule_sendWelcomeEmails')
+    .addItem('Test Welcome Email', 'CommunicationModule_testWelcomeEmail'));
     
   // 3. System section
   menu.addSubMenu(ui.createMenu('System')
@@ -278,7 +281,21 @@ function createFullMenu() {
     .addItem('Fix Swimmer Records Access', 'fixSwimmerRecordsAccess_menuWrapper')
     .addItem('Apply Configuration Changes', 'AdministrativeModule_applyConfigurationChanges')
     .addSeparator()
-    .addItem('Show Logs', 'ErrorHandling_showLogViewer'));
+    .addItem('Show Logs', 'ErrorHandling_showLogViewer')
+    .addItem('Show Version Info', 'VersionControl_showVersionInfo'));
+    
+  // 4. Tools & Diagnostics submenu
+  menu.addSubMenu(ui.createMenu('Tools & Diagnostics')
+    .addItem('System Health Check', 'DebugModule_performSystemHealthCheck')
+    .addItem('System Diagnostics', 'VersionControl_showDiagnostics')
+    .addSeparator()
+    .addItem('Repair System', 'DebugModule_repairSystem')
+    .addItem('Fix Menu', 'fixMenu')
+    .addItem('Reload All Menus', 'reloadAllMenus')
+    .addItem('Install Trigger', 'installOnOpenTrigger')
+    .addSeparator()
+    .addItem('Clear System Cache', 'VersionControl_clearCache')
+    .addItem('Test Menu Creation', 'DebugModule_testMenuCreation'));
     
   // Add About item and the menu to UI
   menu.addSeparator()

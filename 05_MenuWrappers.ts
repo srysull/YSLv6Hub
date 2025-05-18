@@ -191,6 +191,37 @@ function VersionControl_showVersionInfo() {
   return VersionControl.showVersionInfo();
 }
 
+function VersionControl_clearCache() {
+  if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
+    ErrorHandling.logMessage('Menu: Clear Cache', 'INFO', 'VersionControl_clearCache');
+  }
+  return VersionControl.clearCache();
+}
+
+/**
+ * Debug Module Functions
+ */
+function DebugModule_performSystemHealthCheck() {
+  if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
+    ErrorHandling.logMessage('Menu: System Health Check', 'INFO', 'DebugModule_performSystemHealthCheck');
+  }
+  return DebugModule.performSystemHealthCheck();
+}
+
+function DebugModule_repairSystem() {
+  if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
+    ErrorHandling.logMessage('Menu: Repair System', 'INFO', 'DebugModule_repairSystem');
+  }
+  return DebugModule.repairSystem();
+}
+
+function DebugModule_testMenuCreation() {
+  if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
+    ErrorHandling.logMessage('Menu: Test Menu Creation', 'INFO', 'DebugModule_testMenuCreation');
+  }
+  return DebugModule.testMenuCreation();
+}
+
 /**
  * Error Handling Module Functions
  */
