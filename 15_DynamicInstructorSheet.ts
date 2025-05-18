@@ -51,8 +51,26 @@ function createDynamicInstructorSheet() {
     // Check if sheet already exists
     let sheet = ss.getSheetByName(DYNAMIC_INSTRUCTOR_CONFIG.SHEET_NAME);
     
-    // Delete existing sheet if it exists
+    // If sheet exists, prompt user for confirmation before deleting
     if (sheet) {
+      const ui = SpreadsheetApp.getUi();
+      const response = ui.alert(
+        'Sheet Already Exists',
+        `The "${DYNAMIC_INSTRUCTOR_CONFIG.SHEET_NAME}" sheet already exists. Would you like to replace it? This will delete the current sheet and all its data.`,
+        ui.ButtonSet.YES_NO
+      );
+      
+      // If user chooses not to replace the sheet, exit the function
+      if (response !== ui.Button.YES) {
+        ui.alert(
+          'Operation Cancelled',
+          'The Group Lesson Tracker creation was cancelled. The existing sheet has not been modified.',
+          ui.ButtonSet.OK
+        );
+        return sheet;
+      }
+      
+      // User confirmed, proceed with deletion
       ss.deleteSheet(sheet);
     }
     
