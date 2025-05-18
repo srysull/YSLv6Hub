@@ -15,7 +15,24 @@
  */
 function onOpen() {
   try {
-    // Try to create the full menu first
+    Logger.log('onOpen trigger function started from 00_TriggerFunctions.ts');
+    
+    // Force properties to true to ensure menu appears
+    PropertiesService.getScriptProperties().setProperty('systemInitialized', 'true');
+    PropertiesService.getScriptProperties().setProperty('INITIALIZED', 'true');
+    
+    // Call fixed menu creation first to guarantee a menu appears
+    if (typeof createFixedMenu === 'function') {
+      Logger.log('Calling createFixedMenu from MenuFix.gs');
+      createFixedMenu();
+      Logger.log('createFixedMenu completed successfully');
+      return; // Exit early if fixed menu was created
+    }
+    
+    // If createFixedMenu is not available, fall back to standard menu creation
+    Logger.log('createFixedMenu not found, using standard menu creation');
+    
+    // Create the full menu
     createFullMenu();
     
     // Call the special sync menu creator from SyncMenu.gs
@@ -26,9 +43,17 @@ function onOpen() {
       // Fallback if createSyncMenu is not available
       const ui = SpreadsheetApp.getUi();
       ui.createMenu('Sync')
-        .addItem('Sync Student Data', 'syncSwimmerData_menuWrapper')
+        .addItem('Sync Student Data', 'directSyncStudentData')
         .addToUi();
     }
+    
+    // Create an additional emergency repair menu for troubleshooting
+    const ui = SpreadsheetApp.getUi();
+    ui.createMenu('Emergency Menu')
+      .addItem('Fix Menu', 'completeMenuFix')
+      .addItem('Install Trigger', 'fixTriggers')
+      .addItem('Reload All Menus', 'reloadAllMenus')
+      .addToUi();
     
     // Log successful menu creation
     Logger.log('Full menu created in onOpen trigger');
@@ -41,6 +66,8 @@ function onOpen() {
       .addItem('Initialize System', 'AdministrativeModule_showInitializationDialog')
       .addItem('Fix Swimmer Records Access', 'fixSwimmerRecordsAccess_menuWrapper')
       .addItem('Fix Menu', 'fixMenu')
+      .addItem('Install Trigger', 'installOnOpenTrigger')
+      .addItem('Reload All Menus', 'reloadAllMenus')
       .addItem('About YSL v6 Hub', 'AdministrativeModule_showAboutDialog')
       .addToUi();
       
@@ -51,7 +78,7 @@ function onOpen() {
       } else {
         // Fallback if createSyncMenu is not available
         ui.createMenu('Sync')
-          .addItem('Sync Student Data', 'syncSwimmerData_menuWrapper')
+          .addItem('Sync Student Data', 'YSL_SYNC_STUDENT_DATA')
           .addToUi();
       }
     } catch (syncMenuError) {

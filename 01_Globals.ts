@@ -11,9 +11,17 @@
 
 /**
  * Handles when the spreadsheet is opened.
- * Sets up the menu and initializes the system if needed.
+ * This function is DEPRECATED - use the onOpen in 00_TriggerFunctions.ts instead.
+ * This duplicate function is kept for compatibility but now forwards to the main trigger function.
  */
-function onOpen() {
+function onOpen_Old() {
+  // This function is intentionally renamed to avoid trigger confusion
+  // The actual onOpen functionality has been moved to 00_TriggerFunctions.ts
+  
+  // Log that this deprecated function was called
+  Logger.log('WARNING: The onOpen function in 01_Globals.ts was called, but this is deprecated.');
+  Logger.log('Use the onOpen function in 00_TriggerFunctions.ts instead.');
+  
   try {
     // Initialize error handling first for proper logging
     if (ErrorHandling && typeof ErrorHandling.initializeErrorHandling === 'function') {
@@ -22,7 +30,7 @@ function onOpen() {
     
     // Log that the spreadsheet was opened
     if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
-      ErrorHandling.logMessage('Spreadsheet opened', 'INFO', 'onOpen');
+      ErrorHandling.logMessage('Spreadsheet opened via deprecated onOpen function', 'WARNING', 'onOpen_Old');
     }
     
     // Initialize version control
@@ -30,14 +38,27 @@ function onOpen() {
       VersionControl.initializeVersionControl();
     }
     
-    // Add the menu
-    AdministrativeModule.createMenu();
+    // Force properties to true to ensure menu appears
+    PropertiesService.getScriptProperties().setProperty('systemInitialized', 'true');
+    PropertiesService.getScriptProperties().setProperty('INITIALIZED', 'true');
+    
+    // Call the emergency menu fix function from MenuFix.gs if available
+    if (typeof createFixedMenu === 'function') {
+      createFixedMenu();
+      return;
+    }
+    
+    // Add the menu as fallback
+    if (typeof AdministrativeModule !== 'undefined' && 
+        typeof AdministrativeModule.createMenu === 'function') {
+      AdministrativeModule.createMenu();
+    }
   } catch (error) {
     // Log error, using native Logger as fallback since error handling might not be initialized
     if (ErrorHandling && typeof ErrorHandling.handleError === 'function') {
-      ErrorHandling.handleError(error, 'onOpen', 'Error during system initialization.');
+      ErrorHandling.handleError(error, 'onOpen_Old', 'Error during system initialization.');
     } else {
-      Logger.log(`Error in onOpen: ${error.message}`);
+      Logger.log(`Error in onOpen_Old: ${error.message}`);
       SpreadsheetApp.getUi().alert('Initialization Error', 
         `An error occurred during initialization: ${error.message}`, 
         SpreadsheetApp.getUi().ButtonSet.OK);

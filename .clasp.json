@@ -1,0 +1,6 @@
+{
+  "scriptId": "17mxN2QUfg6sWx7X88TYeJ_ceaxjp8g07b6MivqFzqnv0-u8Y60tEM9FV",
+  "rootDir": ".",
+  "fileExtension": "ts",
+  "filePushOrder": ["sync_function.js", "*.ts", "*.js", "*.gs", "*.html"]
+}
