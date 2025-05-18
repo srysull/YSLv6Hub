@@ -17,9 +17,26 @@ const REPORT_TYPES = {
 };
 
 // Placeholder patterns for report templates
-// Using shared placeholders from 18_PlaceholdersConstants.ts
-// Local reference for better readability
-const REPORT_PLACEHOLDERS = SHARED_PLACEHOLDERS;
+// Copy of shared placeholders from 18_PlaceholdersConstants.ts for use in this module
+const REPORT_PLACEHOLDERS = {
+  // Common student/class placeholders
+  STUDENT_NAME: '{{student_name}}',
+  STUDENT_ID: '{{student_id}}',
+  PARENT_NAME: '{{parent_name}}',
+  CLASS_NAME: '{{class_name}}',
+  INSTRUCTOR_NAME: '{{instructor_name}}',
+  SESSION_NAME: '{{session_name}}',
+  LEVEL: '{{level}}',
+  NEXT_LEVEL: '{{next_level}}',
+  
+  // Report-specific placeholders
+  REPORT_DATE: '{{report_date}}',
+  SKILLS_TABLE: '{{skills_table}}',
+  COMMENTS: '{{comments}}',
+  NEXT_STEPS: '{{next_steps}}',
+  ASSESSMENT_SUMMARY: '{{assessment_summary}}',
+  RECOMMENDED_CLASSES: '{{recommended_classes}}'
+};
 
 /**
  * Generates mid-session progress reports for selected classes
