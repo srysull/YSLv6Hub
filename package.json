@@ -1,0 +1,49 @@
+{
+  "name": "yslv6hub",
+  "version": "1.0.0",
+  "description": "YSL Swim Lessons Hub - Google Sheets application for swim lesson management",
+  "main": "index.js",
+  "scripts": {
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint --fix src/**/*.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "predeploy": "npm run lint && npm run test && npm run build",
+    "deploy": "clasp push",
+    "postdeploy": "./tools/sync-ysl-folders.sh",
+    "open": "clasp open",
+    "logs": "clasp logs",
+    "setup": "./tools/setup.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/srysull/YSLv6Hub.git"
+  },
+  "keywords": [
+    "google-sheets",
+    "apps-script",
+    "typescript",
+    "swim-lessons"
+  ],
+  "author": "Sean Sullivan",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/srysull/YSLv6Hub/issues"
+  },
+  "homepage": "https://github.com/srysull/YSLv6Hub#readme",
+  "devDependencies": {
+    "@google/clasp": "^2.4.2",
+    "@types/google-apps-script": "^1.0.62",
+    "@types/jest": "^29.5.3",
+    "@typescript-eslint/eslint-plugin": "^6.1.0",
+    "@typescript-eslint/parser": "^6.1.0",
+    "eslint": "^8.45.0",
+    "jest": "^29.6.1",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.1.6"
+  }
+}

@@ -1,109 +1,164 @@
-# YSLv6Hub Enhanced - Testing Plan
+# YSLv6Hub Testing Strategy
 
-This document outlines the testing process for the enhanced YSLv6Hub system. Use this plan to verify that all new features work correctly.
+This document outlines the comprehensive testing strategy for the refactored YSLv6Hub system. It combines both manual testing for Google Sheets functionality and automated testing using Jest for the TypeScript codebase.
 
-## Test Environment Setup
+## Testing Environment Setup
 
-1. Create a new Google Sheet
-2. Go to Extensions > Apps Script
-3. Copy all numbered `.gs` files (01_Globals.gs through 17_HistoryModule.gs) and FixedConfigDialog.gs into the Apps Script editor
-4. Save and close the editor
-5. Refresh your spreadsheet
+### Local Development Testing
 
-## Test Plan
+1. **Unit Testing with Jest**
+   - All TypeScript code is tested using Jest with Google Apps Script service mocks
+   - Run tests locally with: `npm test`
+   - Use watch mode during development: `npm test -- --watch`
 
-### 1. System Initialization & Configuration
+2. **Static Analysis**
+   - ESLint is configured to enforce code quality standards
+   - Run linting with: `npm run lint`
+   - TypeScript compilation checks: `npm run typecheck`
 
-#### 1.1 Blank Spreadsheet Initialization
-- [ ] Access "YSL Hub Setup" menu
-- [ ] Run "Initialize Blank Spreadsheet"
-- [ ] Verify all required sheets are created (Assumptions, Classes, Roster, etc.)
-- [ ] Confirm basic formatting is applied to each sheet
+3. **Pre-commit Hooks**
+   - All tests and linting run automatically before each commit
+   - Failed tests or linting issues prevent commits
 
-#### 1.2 Fixed Configuration Dialog
-- [ ] Access "YSL Hub Enhanced" menu
-- [ ] Run "System Configuration (Fixed)"
-- [ ] Verify dialog displays without errors
-- [ ] Enter test configuration values
-- [ ] Apply changes and verify they are saved
+### Google Sheets Testing
 
-### 2. Email Templates System
+1. **Test Deployment**
+   - Deploy code to a test Google Sheet using CLASP
+   - Command: `npm run deploy:test`
+   - This deploys to a designated test sheet without affecting production
 
-#### 2.1 Template Management
-- [ ] Access "Email Templates" > "Manage Email Templates"
-- [ ] Verify default templates are available
-- [ ] Create a new template with test placeholders
-- [ ] Edit an existing template
-- [ ] Verify changes are saved
+2. **Testing Environment Setup**
+   - The test sheet is pre-populated with sample data
+   - Test accounts are set up with various permission levels
 
-#### 2.2 Templated Emails
-- [ ] Create a test class with at least one student
-- [ ] Select the test class
-- [ ] Access "Email Templates" > "Send Templated Email"
-- [ ] Select a template and send a test email
-- [ ] Verify placeholders are correctly replaced
-- [ ] Verify email is received at the destination
+## Testing Levels
 
-### 3. Input Validation
+### 1. Unit Testing
 
-#### 3.1 Sheet Validation Rules
-- [ ] Run "Apply Sheet Validation"
-- [ ] Check Classes sheet for dropdown lists (days of week, Select/Exclude)
-- [ ] Check Announcements sheet for status dropdown (Draft, Ready, Sent, Failed)
-- [ ] Check Assessments sheet for rating dropdown
+Unit tests verify individual functions in isolation:
 
-#### 3.2 Data Validation
-- [ ] Enter invalid email format in Roster sheet
-- [ ] Enter invalid date format
-- [ ] Enter out-of-range numeric values
-- [ ] Verify validation errors are shown
+- **Core Module Tests**: Verify utility functions, error handling, and logging
+- **Data Access Tests**: Validate sheet reading/writing operations
+- **Template Tests**: Confirm UI generation works correctly
+- **GroupsTracker Tests**: Verify sheet creation and formatting
+- **SkillsSync Tests**: Validate bidirectional synchronization logic
 
-### 4. Integration & Upgrade
+Each module has its own test file with complete coverage of all exported functions.
 
-#### 4.1 Full Upgrade Process
-- [ ] In a copy of an existing YSL Hub spreadsheet
-- [ ] Run "Run Full Upgrade" function
-- [ ] Verify upgrade summary is shown
-- [ ] Check that Upgrade Guide sheet is created
-- [ ] Confirm enhanced menu is available
+### 2. Integration Testing
 
-#### 4.2 Cross-Module Integration
-- [ ] Verify Email Templates can be used with existing Class Management
-- [ ] Verify Input Validation works with existing data entry
-- [ ] Test that configuration changes are properly validated
+Integration tests verify that modules work together:
 
-## Regression Testing
+- **GroupsTracker + SkillsSync Integration**: Verify bidirectional sync works end-to-end
+- **UI + Core Integration**: Test that UI operations correctly trigger core functionality
+- **Menu + Module Integration**: Confirm menu options correctly invoke the right modules
 
-### 5.1 Core Functionality
-- [ ] Create a class and add students
-- [ ] Generate instructor sheets
-- [ ] Send a basic email to class participants
-- [ ] Generate a report
-- [ ] Verify all core functions continue to work as expected
+### 3. End-to-End Testing
 
-### 5.2 Error Handling
-- [ ] Trigger intentional errors (invalid URLs, missing data)
-- [ ] Verify that the error handling system captures and logs errors
-- [ ] Check that user-friendly error messages are displayed
+End-to-end tests verify complete workflows:
+
+- **Full GroupsTracker Creation Workflow**: From setup to student data import
+- **Complete Sync Cycle**: Testing both directions of synchronization
+- **Error Recovery**: Verifying that the system recovers from various failure scenarios
+
+## Test Cases for Critical Functionality
+
+### 1. GroupsTracker Generation
+
+#### 1.1 Sheet Creation and Formatting
+- [ ] Generate GroupsTracker sheet for a new class
+- [ ] Verify header formatting is correctly applied
+- [ ] Confirm all columns have proper headers
+- [ ] Check that sheet protection is correctly applied
+
+#### 1.2 Student Data Population
+- [ ] Import student data from RegistrationInfo sheet
+- [ ] Verify all student records are imported correctly
+- [ ] Check that student names, ages, and other details match the source data
+- [ ] Test with varying class sizes (small, medium, large)
+
+#### 1.3 Skills Column Generation
+- [ ] Verify skill columns are created for the appropriate level
+- [ ] Check that skill descriptions are correct
+- [ ] Confirm that skill order matches the curriculum
+
+### 2. Bidirectional Synchronization
+
+#### 2.1 GroupsTracker to SwimmerSkills
+- [ ] Update skills data in GroupsTracker
+- [ ] Run sync operation
+- [ ] Verify changes are reflected in SwimmerSkills sheet
+- [ ] Test with various data types (text, numbers, dates)
+
+#### 2.2 SwimmerSkills to GroupsTracker
+- [ ] Update student data in SwimmerSkills
+- [ ] Run sync operation
+- [ ] Verify changes are reflected in GroupsTracker sheet
+- [ ] Test with various skill ratings and comments
+
+#### 2.3 Conflict Resolution
+- [ ] Create deliberate conflicts by changing the same data in both sheets
+- [ ] Run sync operation
+- [ ] Verify conflict resolution policy is correctly applied
+- [ ] Check that newer changes take precedence
+
+### 3. Error Handling and Recovery
+
+#### 3.1 Input Validation
+- [ ] Test with invalid skill ratings
+- [ ] Verify validation errors are appropriately displayed
+- [ ] Confirm that invalid data is not synchronized
+
+#### 3.2 Service Interruptions
+- [ ] Simulate API limits and service failures
+- [ ] Verify the system handles these gracefully
+- [ ] Check that user is informed with appropriate error messages
+- [ ] Confirm that the system offers recovery options
+
+#### 3.3 Edge Cases
+- [ ] Test with very large classes
+- [ ] Verify handling of special characters in names and comments
+- [ ] Test with empty sheets and missing data
 
 ## Test Reporting
 
-For each test item, record:
-- Pass/Fail status
-- Any unexpected behavior
-- Error messages encountered
-- Browser and device used
+For each test execution:
 
-## Completion Criteria
+1. **Automated Test Reports**
+   - Jest outputs detailed test results including coverage reports
+   - Failed tests include stack traces and error messages
 
-Testing is considered complete when:
-1. All test cases have been executed
-2. All critical issues have been resolved
-3. The system works correctly on both new and existing spreadsheets
+2. **Manual Test Documentation**
+   - For each manual test case, record:
+     - Pass/Fail status
+     - Screenshots of relevant issues
+     - Steps to reproduce any failures
+     - Environment details (browser, OS, etc.)
 
-## Known Issues
+## Continuous Integration
 
-Document any known issues or limitations discovered during testing:
+Whenever code is pushed to the repository:
 
-1. *Issue description, conditions, workaround (if any)*
-2. *...*
+1. All automated tests are run
+2. Code quality checks are performed
+3. Build verification tests ensure the code compiles correctly
+4. Test coverage reports are generated
+
+## Known Issues and Limitations
+
+Any known issues or testing limitations should be documented here:
+
+1. *Google Apps Script quotas may limit the number of operations in a single execution*
+2. *Testing multiple concurrent users requires manual coordination*
+
+## Test Data Management
+
+Test data is managed through:
+
+1. **Seed Scripts**: Automatically populate test sheets with known data
+2. **Test Fixtures**: JSON files containing sample data for various scenarios
+3. **Reset Functions**: Quickly restore sheets to a known state between tests
+
+---
+
+*Last Updated: May 18, 2025*
