@@ -390,3 +390,32 @@ function onEdit(e) {
     Logger.log(`Error in onEdit trigger: ${error.message}`);
   }
 }
+
+/**
+ * Test function for the sync functionality
+ * This is a standalone function that can be called directly from the menu
+ * It delegates to the GlobalFunctions.testSyncFunctionality method
+ */
+function testSyncFunctionality() {
+  try {
+    // If GlobalFunctions is available, use its testSyncFunctionality function
+    if (typeof GlobalFunctions !== 'undefined' && 
+        typeof GlobalFunctions.testSyncFunctionality === 'function') {
+      return GlobalFunctions.testSyncFunctionality();
+    }
+    
+    // Fallback implementation if GlobalFunctions is not available
+    SpreadsheetApp.getUi().alert(
+      'Test Function Not Available',
+      'The test function is not available. Please make sure the system is properly initialized.',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+  } catch (error) {
+    Logger.log(`Error in testSyncFunctionality: ${error.message}`);
+    SpreadsheetApp.getUi().alert(
+      'Test Error',
+      `An error occurred while testing the sync functionality: ${error.message}`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+  }
+}

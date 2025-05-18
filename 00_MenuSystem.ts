@@ -102,6 +102,8 @@ function createMainMenu() {
     .addItem('Fix Menu', 'fixMenuSystem')
     .addItem('Run Menu Diagnostics', 'runMenuDiagnostics')
     .addSeparator()
+    .addItem('Test Sync Functionality', 'testSyncFunctionality')
+    .addSeparator()
     .addItem('Clear System Cache', 'VersionControl_clearCache')
     .addItem('Test Menu Creation', 'testMenuCreation'));
   

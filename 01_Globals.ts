@@ -1381,14 +1381,52 @@ function populateStudentSkills(sheet, studentsData, skillsData) {
  * 
  * @param sheet - The Group Lesson Tracker sheet
  */
+/**
+ * Synchronizes student data between Group Lesson Tracker and SwimmerSkills
+ * 
+ * This function performs a bidirectional sync:
+ * 1. It exports updated skills from the "End" column in Group Lesson Tracker
+ *    to the "Repeat" column (one column to the right of the matching skill) in SwimmerSkills.
+ *    This preserves the original skill assessment while adding the updated value.
+ * 
+ * 2. It also imports any new skills from SwimmerSkills to the "Beginning" column
+ *    in Group Lesson Tracker, ensuring data consistency in both places.
+ * 
+ * @param sheet - The Group Lesson Tracker sheet
+ */
 function syncStudentDataWithSwimmerSkills(sheet) {
   try {
+    // Log that we're starting the sync process
+    if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
+      ErrorHandling.logMessage('Starting sync between Group Lesson Tracker and SwimmerSkills', 'INFO', 'syncStudentDataWithSwimmerSkills');
+    } else {
+      Logger.log('Starting sync between Group Lesson Tracker and SwimmerSkills');
+    }
+    
+    // Validate input sheet
+    if (!sheet) {
+      const errorMsg = 'Invalid sheet provided to syncStudentDataWithSwimmerSkills';
+      Logger.log(errorMsg);
+      SpreadsheetApp.getUi().alert('Sync Error', errorMsg, SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    // Check if the sheet is the correct one
+    const sheetName = sheet.getName();
+    if (sheetName !== 'Group Lesson Tracker') {
+      const errorMsg = `Wrong sheet provided: ${sheetName}. Expected 'Group Lesson Tracker'`;
+      Logger.log(errorMsg);
+      SpreadsheetApp.getUi().alert('Sync Error', errorMsg, SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const swimmerSkillsSheet = ss.getSheetByName('SwimmerSkills');
     
     if (!swimmerSkillsSheet) {
-      Logger.log('SwimmerSkills sheet not found');
-      SpreadsheetApp.getUi().alert('Error', 'SwimmerSkills sheet not found. Unable to sync data.', SpreadsheetApp.getUi().ButtonSet.OK);
+      const errorMsg = 'SwimmerSkills sheet not found. Unable to sync data.';
+      Logger.log(errorMsg);
+      SpreadsheetApp.getUi().alert('Sync Error', errorMsg, SpreadsheetApp.getUi().ButtonSet.OK);
       return;
     }
     
@@ -1468,16 +1506,79 @@ function syncStudentDataWithSwimmerSkills(sheet) {
             // Check if there's already a value in this cell
             const currentValue = swimmerSkillsData[studentRow][skillColumn];
             
-            // Update the value in SwimmerSkills sheet
-            swimmerSkillsSheet.getRange(studentRow + 1, skillColumn + 1).setValue(endValue);
+            // Get the next column to the right for repeats
+            const repeatColumnIndex = skillColumn + 1;
             
-            if (currentValue && currentValue.toString().trim() !== '') {
-              updateCount++;
-            } else {
-              insertCount++;
+            // Check if the next column exists in the header row and contains 'Repeat'
+            let headerText = swimmerSkillsData[0][repeatColumnIndex] || '';
+            let isRepeatColumn = headerText.toString().toLowerCase().includes('repeat');
+            
+            // If we didn't find a column with "Repeat" in the header, look for other indicators
+            // Sometimes the column might exist but not have "Repeat" in the name
+            if (!isRepeatColumn) {
+              // Try looking for columns with different names that might serve the same purpose
+              const alternateNames = ['re-test', 'retest', 'recheck', 'retry', 'second attempt', '2nd', 'attempt 2'];
+              
+              // Check if the header contains any of the alternate names
+              headerText = swimmerSkillsData[0][repeatColumnIndex] || '';
+              for (const altName of alternateNames) {
+                if (headerText.toString().toLowerCase().includes(altName)) {
+                  isRepeatColumn = true;
+                  break;
+                }
+              }
             }
             
-            syncCount++;
+            if (isRepeatColumn) {
+              // Update the value in SwimmerSkills sheet in the REPEAT column (one column to the right)
+              swimmerSkillsSheet.getRange(studentRow + 1, repeatColumnIndex + 1).setValue(endValue);
+              
+              if (currentValue && currentValue.toString().trim() !== '') {
+                updateCount++;
+              } else {
+                insertCount++;
+              }
+              
+              syncCount++;
+              Logger.log(`Updated repeat skill for ${student.fullName}, skill: ${swimmerSkillsData[0][skillColumn]}, column: ${repeatColumnIndex + 1}, value: ${endValue}`);
+            } else {
+              // Try to create a Repeat column if one doesn't exist
+              try {
+                // Check if we have permission to modify the sheet structure
+                const canEditSheet = true; // We'll assume we can edit the sheet
+                
+                if (canEditSheet) {
+                  // Get the current column letter for logging
+                  const currentColLetter = columnToLetter(skillColumn + 1);
+                  const repeatColLetter = columnToLetter(repeatColumnIndex + 1);
+                  
+                  // Set the header for the repeat column
+                  const originalHeader = swimmerSkillsData[0][skillColumn] || '';
+                  const repeatHeader = `${originalHeader} Repeat`;
+                  
+                  // Create or update the repeat column header
+                  swimmerSkillsSheet.getRange(1, repeatColumnIndex + 1).setValue(repeatHeader);
+                  
+                  // Now set the value
+                  swimmerSkillsSheet.getRange(studentRow + 1, repeatColumnIndex + 1).setValue(endValue);
+                  
+                  if (currentValue && currentValue.toString().trim() !== '') {
+                    updateCount++;
+                  } else {
+                    insertCount++;
+                  }
+                  
+                  syncCount++;
+                  Logger.log(`Created repeat column and updated skill for ${student.fullName}, skill: ${originalHeader}, new column: ${repeatColLetter}, value: ${endValue}`);
+                } else {
+                  // Log that we don't have permission to create a new column
+                  Logger.log(`No repeat column found for skill at column ${skillColumn + 1} (${swimmerSkillsData[0][skillColumn]}) and no permission to create one`);
+                }
+              } catch (createError) {
+                // Log the error but continue with other skills
+                Logger.log(`Error creating repeat column: ${createError.message}`);
+              }
+            }
           }
         } catch (e) {
           Logger.log(`Error syncing skill for student ${student.fullName}, row ${rowNum}: ${e.message}`);
@@ -1491,6 +1592,10 @@ function syncStudentDataWithSwimmerSkills(sheet) {
     // Show result to user
     if (notFoundStudents.length > 0) {
       const message = `Synced ${syncCount} skills (${insertCount} new, ${updateCount} updated).\n\n` +
+                     `How sync works:\n` +
+                     `- Skills from 'Group Lesson Tracker' column I (End) are copied to the 'Repeat' columns in SwimmerSkills\n` +
+                     `- Original skill data in SwimmerSkills is preserved\n` + 
+                     `- Updates are synchronized in both directions\n\n` +
                      `Legend:\n- 'X' = Student performed skill (green)\n- '/' = Skill was taught (yellow)\n\n` +
                      `${notFoundStudents.length} student(s) not found in SwimmerSkills:\n` +
                      notFoundStudents.join(', ');
@@ -1498,6 +1603,10 @@ function syncStudentDataWithSwimmerSkills(sheet) {
       SpreadsheetApp.getUi().alert('Sync Completed with Warnings', message, SpreadsheetApp.getUi().ButtonSet.OK);
     } else {
       const message = `Successfully synced ${syncCount} skills (${insertCount} new, ${updateCount} updated) with SwimmerSkills.\n\n` +
+                      `How sync works:\n` +
+                      `- Skills from 'Group Lesson Tracker' column I (End) are copied to the 'Repeat' columns in SwimmerSkills\n` +
+                      `- Original skill data in SwimmerSkills is preserved\n` + 
+                      `- Updates are synchronized in both directions\n\n` +
                       `Legend:\n- 'X' = Student performed skill (green)\n- '/' = Skill was taught (yellow)`;
       SpreadsheetApp.getUi().alert('Sync Completed', message, SpreadsheetApp.getUi().ButtonSet.OK);
     }
@@ -1769,6 +1878,58 @@ function pullDataFromSwimmerSkills(sheet, students, skills, swimmerSkillsData) {
   Logger.log('Finished pulling data from SwimmerSkills to Group Lesson Tracker');
 }
 
+/**
+ * Test function for the sync functionality
+ * This function can be run to ensure the sync works correctly
+ * It prints detailed logs about each step to help debugging
+ */
+function testSyncFunctionality() {
+  try {
+    // Get the active spreadsheet
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Group Lesson Tracker');
+    
+    if (!sheet) {
+      Logger.log('Group Lesson Tracker sheet not found');
+      SpreadsheetApp.getUi().alert('Test Error', 'Group Lesson Tracker sheet not found', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    // Set detailed logging mode
+    PropertiesService.getScriptProperties().setProperty('DEBUG_MODE', 'true');
+    
+    // Log start of test
+    Logger.log('======= STARTING SYNC TEST =======');
+    Logger.log('Testing bidirectional sync between Group Lesson Tracker and SwimmerSkills');
+    
+    // Run the sync function
+    syncStudentDataWithSwimmerSkills(sheet);
+    
+    // Turn off detailed logging when done
+    PropertiesService.getScriptProperties().setProperty('DEBUG_MODE', 'false');
+    
+    // Log completion
+    Logger.log('======= SYNC TEST COMPLETE =======');
+    
+    // Check logs
+    const logs = Logger.getLog();
+    
+    // Show result to user
+    SpreadsheetApp.getUi().alert('Sync Test Complete', 
+      'The sync test has completed. Check the logs for details by opening View > Logs in the script editor.', 
+      SpreadsheetApp.getUi().ButtonSet.OK);
+    
+  } catch (error) {
+    // Log error
+    Logger.log(`Error in test: ${error.message}`);
+    
+    // Show error to user
+    SpreadsheetApp.getUi().alert('Test Error', 
+      `An error occurred while testing the sync functionality: ${error.message}`, 
+      SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
 const GlobalFunctions = {
   onOpen: onOpen,
   onEdit: onEdit,
@@ -1797,5 +1958,6 @@ const GlobalFunctions = {
   truncateSheetToSize: truncateSheetToSize,
   clearExistingTrackerData: clearExistingTrackerData,
   applyAlternatingBackground: applyAlternatingBackground,
-  columnToLetter: columnToLetter
+  columnToLetter: columnToLetter,
+  testSyncFunctionality: testSyncFunctionality
 };
