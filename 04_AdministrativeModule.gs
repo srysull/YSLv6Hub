@@ -1,4 +1,4 @@
-  /**
+/**
  * YSL Hub v2 Administrative Module
  * 
  * This module handles system initialization, configuration management, and user interface
@@ -86,6 +86,11 @@ function createMenu() {
         menu.addSubMenu(ui.createMenu('Class Management')
               .addItem('Create Dynamic Class Hub', 'DynamicInstructorSheet_createDynamicInstructorSheet')
               .addItem('Update with Selected Class', 'DynamicInstructorSheet_rebuildDynamicInstructorSheet')
+              .addSeparator()
+              .addItem('Import Registration Data', 'importRegistrationData_menuWrapper')
+              .addItem('Map Registration Fields', 'FieldMapping_showFieldMappingDialog') 
+              .addSeparator()
+              .addItem('Create Swimmer Logs', 'showSwimmerLogsDialog')
               .addSeparator()
               .addItem('Refresh Class List', 'DataIntegrationModule_updateClassSelector')
               .addItem('Refresh Roster Data', 'DataIntegrationModule_refreshRosterData'))
@@ -571,13 +576,13 @@ function fullInitialization() {
     // Validation approach
     const requiredFields = ['sessionName', 'rosterFolderUrl', 'reportTemplateUrl', 'swimmerRecordsUrl', 'sessionProgramsUrl'];
     const missingFields = [];
-
+	
     for (const field of requiredFields) {
       if (!validatedValues[field]) {
         missingFields.push(field);
       }
     }
-
+	
     if (missingFields.length > 0) {
       ui.alert(
         'Missing Configuration',

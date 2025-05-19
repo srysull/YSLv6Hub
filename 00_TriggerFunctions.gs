@@ -18,6 +18,30 @@ function onOpen() {
     // Try to create the full menu first
     createFullMenu();
     
+    // Check if we need to initialize the YSLv6Hub sheet
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const dashboardSheet = ss.getSheetByName('YSLv6Hub');
+    
+    if (dashboardSheet) {
+      // Check if the new dashboard format is already set up
+      const dashboardData = dashboardSheet.getDataRange().getValues();
+      let hasNewFormat = false;
+      
+      // Look for "System Initialization Status" section
+      for (let i = 0; i < Math.min(dashboardData.length, 10); i++) {
+        if (String(dashboardData[i][0]).includes('System Initialization Status')) {
+          hasNewFormat = true;
+          break;
+        }
+      }
+      
+      // If it doesn't have the new format, set it up
+      if (!hasNewFormat && typeof YSLv6Hub !== 'undefined' && 
+          typeof YSLv6Hub.setupYSLv6Hub === 'function') {
+        YSLv6Hub.setupYSLv6Hub(dashboardSheet);
+      }
+    }
+    
     // Log successful menu creation
     Logger.log('Full menu created in onOpen trigger');
   } catch (error) {
@@ -219,10 +243,27 @@ function onEdit(e) {
     if (typeof GlobalFunctions !== 'undefined' && 
         typeof GlobalFunctions.onEdit === 'function') {
       GlobalFunctions.onEdit(e);
-      return;
     }
     
-    // Fallback implementation if GlobalFunctions is not available
+    // Check if FieldMapping is available and call its handler
+    if (typeof FieldMapping !== 'undefined' && 
+        typeof FieldMapping.onFieldMappingEdit === 'function') {
+      FieldMapping.onFieldMappingEdit(e);
+    }
+    
+    // If DynamicInstructorSheet is available, call its handler
+    if (typeof DynamicInstructorSheet !== 'undefined' && 
+        typeof DynamicInstructorSheet.onEditDynamicInstructorSheet === 'function') {
+      DynamicInstructorSheet.onEditDynamicInstructorSheet(e);
+    }
+    
+    // If HistoryModule is available, call its handler
+    if (typeof HistoryModule !== 'undefined' && 
+        typeof HistoryModule.onHistorySelectionEdit === 'function') {
+      HistoryModule.onHistorySelectionEdit(e);
+    }
+    
+    // Fallback implementation if no modules handled the edit
     const sheet = e.source.getActiveSheet();
     const sheetName = sheet.getName();
     const range = e.range;

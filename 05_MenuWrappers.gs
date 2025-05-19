@@ -349,3 +349,76 @@ function fixSwimmerRecordsAccess_menuWrapper() {
   }
   return fixSwimmerRecordsAccess();
 }
+
+/**
+ * Field Mapping Module Functions
+ */
+function FieldMapping_showFieldMappingDialog() {
+  if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
+    ErrorHandling.logMessage('Menu: Show Field Mapping Dialog', 'INFO', 'FieldMapping_showFieldMappingDialog');
+  }
+  return FieldMapping.showFieldMappingDialog();
+}
+
+/**
+ * Data Import Module Functions
+ */
+function importRegistrationData_menuWrapper() {
+  if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
+    ErrorHandling.logMessage('Menu: Import Registration Data', 'INFO', 'importRegistrationData_menuWrapper');
+  }
+  return importRegistrationData();
+}
+
+/**
+ * SwimmerLog Module Functions
+ */
+function showSwimmerLogsDialog() {
+  if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
+    ErrorHandling.logMessage('Menu: Show SwimmerLogs Dialog', 'INFO', 'showSwimmerLogsDialog');
+  }
+  
+  // Check if required field mappings are complete
+  let fieldMappings;
+  if (typeof FieldMapping !== 'undefined' && typeof FieldMapping.getFieldMappings === 'function') {
+    fieldMappings = FieldMapping.getFieldMappings();
+  } else {
+    // Fallback to direct property access
+    try {
+      const scriptProperties = PropertiesService.getScriptProperties();
+      const mappingsJson = scriptProperties.getProperty('fieldMappings');
+      fieldMappings = mappingsJson ? JSON.parse(mappingsJson) : {};
+    } catch (error) {
+      fieldMappings = {};
+    }
+  }
+  
+  // Check if basic fields are mapped
+  const requiredFields = ['firstName', 'lastName', 'dob'];
+  const missingFields = requiredFields.filter(field => !fieldMappings[field]);
+  const mappingComplete = missingFields.length === 0;
+  
+  // Get session name for pre-filling
+  let sessionName = '';
+  if (typeof YSLv6Hub !== 'undefined' && typeof YSLv6Hub.getSessionName === 'function') {
+    sessionName = YSLv6Hub.getSessionName() || '';
+  }
+  
+  // Show the dialog with mapping status
+  const html = HtmlService.createTemplateFromFile('SwimmerLogsDialog')
+    .evaluate()
+    .setWidth(450)
+    .setHeight(400)
+    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+  
+  SpreadsheetApp.getUi().showModalDialog(html, 'Create Swimmer Logs');
+  
+  return true;
+}
+
+function createSwimmerLogs(options) {
+  if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
+    ErrorHandling.logMessage('Menu: Create Swimmer Logs', 'INFO', 'createSwimmerLogs');
+  }
+  return SwimmerLog.createSwimmerLogs(options);
+}
