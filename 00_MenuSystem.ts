@@ -181,8 +181,9 @@ function fixTriggers() {
 
 /**
  * Tests menu creation
+ * @deprecated Use testMenuCreation from DebugModule instead
  */
-function testMenuCreation() {
+function testMenuCreation_MenuSystem() {
   // Test menu creation and log results
   try {
     createMainMenu();
@@ -256,4 +257,9 @@ function runMenuDiagnostics() {
   
   // Show diagnostics
   SpreadsheetApp.getUi().alert('Menu Diagnostics', message, SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+// Export for testing
+if (typeof global !== 'undefined') {
+  (global as any).onOpen = onOpen;
 }

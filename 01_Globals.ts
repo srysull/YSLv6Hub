@@ -72,7 +72,7 @@ function onOpen_Old() {
  * 
  * @param e - The edit event object
  */
-function onEdit(e) {
+export function onEdit(e) {
   try {
     // Get the edited range information
     const sheet = e.source.getActiveSheet();
@@ -182,7 +182,7 @@ function handleClassesSheetEdit(sheet, row, col, value) {
       );
       
       if (result === ui.Button.YES) {
-        InstructorResourceModule.createInstructorSheet(classInfo);
+        InstructorResourceModule.generateInstructorSheets();
       }
     } catch (error) {
       // Log error with proper error handling
@@ -1488,7 +1488,7 @@ function syncStudentDataWithSwimmerSkills(sheet) {
       
       // For each skill, check the student's end column value in Group Lesson Tracker
       // and update the corresponding cell in SwimmerSkills
-      for (const [rowNum, skill] of Object.entries(skills)) {
+      for (const [rowNum, skill] of Object.entries(skills) as [string, {name: string, row: number, column?: number}][]) {
         // Get the value from the student's "ending" column (for completed assessment)
         try {
           // Calculate the cell reference for the ending column (e.g., "C14")
@@ -1501,6 +1501,7 @@ function syncStudentDataWithSwimmerSkills(sheet) {
           // If there's a value in the ending column, update it in SwimmerSkills
           if (endValue && endValue.toString().trim() !== '') {
             // The column in SwimmerSkills is skill.column
+            if (skill.column === undefined) continue;
             const skillColumn = skill.column;
             
             // Check if there's already a value in this cell
@@ -1707,7 +1708,7 @@ function collectSkillsFromGroupLessonTracker(sheet) {
       
       if (skillName && skillName.toString().trim() !== '') {
         // We need to find the corresponding column in SwimmerSkills
-        const skill = {
+        const skill: {name: string, row: number, column?: number} = {
           name: skillName.toString().trim(),
           row: row
         };
@@ -1842,9 +1843,10 @@ function pullDataFromSwimmerSkills(sheet, students, skills, swimmerSkillsData) {
     }
     
     // For each skill, get the value from SwimmerSkills and update the beginning column
-    for (const [rowNum, skill] of Object.entries(skills)) {
+    for (const [rowNum, skill] of Object.entries(skills) as [string, {name: string, row: number, column?: number}][]) {
       try {
         // Get the value from SwimmerSkills
+        if (skill.column === undefined) continue;
         const skillValue = swimmerSkillsData[studentRow][skill.column];
         const skillName = swimmerSkillsData[0][skill.column]; // Get skill name from header row
         
@@ -1883,7 +1885,7 @@ function pullDataFromSwimmerSkills(sheet, students, skills, swimmerSkillsData) {
  * This function can be run to ensure the sync works correctly
  * It prints detailed logs about each step to help debugging
  */
-function testSyncFunctionality() {
+export function testSyncFunctionality() {
   try {
     // Get the active spreadsheet
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1961,3 +1963,8 @@ const GlobalFunctions = {
   columnToLetter: columnToLetter,
   testSyncFunctionality: testSyncFunctionality
 };
+
+// Export for testing
+if (typeof global !== 'undefined') {
+  (global as any).GlobalFunctions = GlobalFunctions;
+}

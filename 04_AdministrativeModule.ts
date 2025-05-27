@@ -980,6 +980,7 @@ function fixSystemInitializationProperty() {
 }
 
 // Global variable export
+// @ts-ignore - Global variable declaration
 const AdministrativeModule = {
   createMenu,
   showInitializationDialog,

@@ -366,7 +366,7 @@ function fixSwimmerRecordsAccess() {
  * 
  * @param e - The edit event object
  */
-function onEdit(e) {
+export function triggerOnEdit(e) {
   try {
     // If GlobalFunctions is available, use its onEdit function
     if (typeof GlobalFunctions !== 'undefined' && 
@@ -396,7 +396,7 @@ function onEdit(e) {
  * This is a standalone function that can be called directly from the menu
  * It delegates to the GlobalFunctions.testSyncFunctionality method
  */
-function testSyncFunctionality() {
+export function triggerTestSyncFunctionality() {
   try {
     // If GlobalFunctions is available, use its testSyncFunctionality function
     if (typeof GlobalFunctions !== 'undefined' && 

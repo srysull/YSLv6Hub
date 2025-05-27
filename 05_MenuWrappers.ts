@@ -38,7 +38,9 @@ function DataIntegrationModule_pullAssessmentCriteria() {
   if (ErrorHandling && typeof ErrorHandling.logMessage === 'function') {
     ErrorHandling.logMessage('Menu: Pull Assessment Criteria', 'INFO', 'DataIntegrationModule_pullAssessmentCriteria');
   }
-  return DataIntegrationModule.pullAssessmentCriteria();
+  const config: any = AdministrativeModule && typeof AdministrativeModule.getSystemConfiguration === 'function' ?
+    AdministrativeModule.getSystemConfiguration() : {};
+  return DataIntegrationModule.pullAssessmentCriteria(config.swimmerRecordsUrl || '');
 }
 
 function DataIntegrationModule_updateInstructorData() {

@@ -412,6 +412,7 @@ function exportLog() {
 }
 
 // Global variable export
+// @ts-ignore - Global variable declaration
 const ErrorHandling = {
   initializeErrorHandling,
   logMessage,
@@ -423,3 +424,8 @@ const ErrorHandling = {
   exportLog,
   setLogLevel
 };
+
+// Export for testing
+if (typeof global !== 'undefined') {
+  (global as any).ErrorHandling = ErrorHandling;
+}

@@ -463,9 +463,9 @@ function exportHistory() {
       .setHeading(DocumentApp.ParagraphHeading.HEADING2)
       .setAlignment(DocumentApp.HorizontalAlignment.CENTER);
     
-    body.appendParagraph(`Exported on: ${timestamp.replace('_', ' ')}`)
-      .setItalic(true)
-      .setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+    const exportParagraph = body.appendParagraph(`Exported on: ${timestamp.replace('_', ' ')}`);
+    exportParagraph.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+    exportParagraph.editAsText().setItalic(true);
     
     // Add spacing
     body.appendParagraph('');
@@ -483,7 +483,8 @@ function exportHistory() {
     // Format header row
     const headerRow = table.getRow(0);
     for (let i = 0; i < numCols; i++) {
-      headerRow.getCell(i).setBackgroundColor('#f3f3f3').setBold(true);
+      headerRow.getCell(i).setBackgroundColor('#f3f3f3');
+      headerRow.getCell(i).editAsText().setBold(true);
     }
     
     // Save the document

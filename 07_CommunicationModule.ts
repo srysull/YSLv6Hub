@@ -532,7 +532,7 @@ function sendSelectedCommunication() {
     // Get class details for replacements (if applicable)
     let classDetails = null;
     if (selectedClass && selectedClass !== 'No classes available') {
-      classDetails = getClassDetails(selectedClass);
+      classDetails = getCommunicationClassDetails(selectedClass);
     }
     
     // Process and send emails
@@ -735,7 +735,7 @@ function extractClassId(selectedClass) {
  * @param selectedClass - The selected class text
  * @returns Object with class details
  */
-function getClassDetails(selectedClass) {
+function getCommunicationClassDetails(selectedClass) {
   try {
     // Get classes data
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1273,7 +1273,7 @@ function sendWelcomeEmails() {
  * @param classId - The class ID
  * @returns Number of students
  */
-function countStudentsInClass(classId) {
+function countCommunicationStudentsInClass(classId) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const rosterSheet = ss.getSheetByName('Roster');
@@ -1686,6 +1686,7 @@ function sendReadyAnnouncements() {
 }
 
 // Global variable export
+// @ts-ignore - Global variable declaration
 const CommunicationModule = {
   createCommunicationsHub,
   createCommunicationLog,

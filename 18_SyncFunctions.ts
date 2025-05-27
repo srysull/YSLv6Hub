@@ -37,7 +37,8 @@ function syncSwimmerData() {
             GlobalFunctions.syncStudentDataWithSwimmerSkills(trackerSheet);
           } else {
             // Direct fallback if GlobalFunctions is not available
-            syncStudentDataWithSwimmerSkills(trackerSheet);
+            // This should not happen, but log error if it does
+            Logger.log('ERROR: GlobalFunctions.syncStudentDataWithSwimmerSkills is not available');
           }
           return true;
         } else {
@@ -56,7 +57,8 @@ function syncSwimmerData() {
       GlobalFunctions.syncStudentDataWithSwimmerSkills(sheet);
     } else {
       // Direct fallback if GlobalFunctions is not available
-      syncStudentDataWithSwimmerSkills(sheet);
+      // This should not happen, but log error if it does
+      Logger.log('ERROR: GlobalFunctions.syncStudentDataWithSwimmerSkills is not available');
     }
     
     return true;

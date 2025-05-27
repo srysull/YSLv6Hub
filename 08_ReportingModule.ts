@@ -146,7 +146,7 @@ function generateMidSessionReports() {
     const errors = [];
     
     for (const classId of selectedClasses) {
-      const classDetails = getClassDetails(classId);
+      const classDetails = getReportingClassDetails(classId);
       
       if (!classDetails) {
         errors.push(`Could not get details for class ID ${classId}`);
@@ -366,7 +366,7 @@ function generateEndSessionReports() {
     const errors = [];
     
     for (const classId of selectedClasses) {
-      const classDetails = getClassDetails(classId);
+      const classDetails = getReportingClassDetails(classId);
       
       if (!classDetails) {
         errors.push(`Could not get details for class ID ${classId}`);
@@ -773,7 +773,7 @@ function createSubfolder(parentFolder, subfolderName) {
  * @param classId - The class ID
  * @returns Object with class details
  */
-function getClassDetails(classId) {
+function getReportingClassDetails(classId) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const classesSheet = ss.getSheetByName('Classes');

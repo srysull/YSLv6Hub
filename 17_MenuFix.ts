@@ -30,8 +30,9 @@ function completeMenuFix() {
 
 /**
  * Fixes all triggers by removing duplicates and creating a single correct onOpen trigger
+ * @deprecated Use fixTriggers from 00_MenuSystem.ts instead
  */
-function fixTriggers() {
+function fixTriggers_MenuFix() {
   // Delete any existing onOpen triggers to avoid duplication/conflict
   const triggers = ScriptApp.getProjectTriggers();
   let deletedCount = 0;
@@ -141,8 +142,9 @@ function createFixedMenu() {
 
 /**
  * Run diagnostics on the menu system and displays results
+ * @deprecated Use runMenuDiagnostics from 00_MenuSystem.ts instead
  */
-function runMenuDiagnostics() {
+function runMenuDiagnostics_MenuFix() {
   // Check if key functions exist
   const diagnostics = {
     'createFullMenu': typeof createFullMenu === 'function',

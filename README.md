@@ -6,7 +6,20 @@ YSLv6Hub is a comprehensive Google Workspace system for managing the Youth Swim 
 
 This project uses clasp's direct TypeScript compilation capability to deploy TypeScript files directly to Google Apps Script.
 
-Key files:
+### Directory Organization
+```
+/Users/galagrove/Projects/YSL/
+├── YSLv6Hub-main/          # Main development repository (this folder)
+│   ├── *.ts                # TypeScript source files
+│   ├── *.gs                # Compiled Google Apps Script files
+│   ├── tests/              # Unit tests with Jest
+│   ├── e2e/                # End-to-end tests with Puppeteer
+│   └── templates/          # Excel templates
+├── archive/                # Old versions and backups
+└── documentation/          # Business analysis and documentation
+```
+
+### Key Files
 - `00_MenuSystem.ts` - Centralized menu implementation
 - `00_TriggerFunctions.ts` - Entry points for menu and edit triggers
 - `01_Globals.ts` - Common functions and utilities
@@ -15,6 +28,7 @@ Key files:
 - `04_AdministrativeModule.ts` - System administration
 - `05_MenuWrappers.ts` - Menu function wrappers
 - `15_DynamicInstructorSheet.ts` - Group Lesson Tracker generation
+- `18_SyncFunctions.ts` - Data synchronization functions
 
 ## Key Features
 
@@ -31,12 +45,27 @@ Key files:
 - **Blank Spreadsheet Initializer**: Creates all required sheets and structure from a completely blank spreadsheet
 - **Email Templates System**: Reusable email templates with placeholders for personalization
 - **Input Validation**: Enhanced data validation throughout the system for improved data integrity
+- **Local Testing Framework**: Jest unit tests and Puppeteer E2E tests for development
 
 ## Development Workflow
 
+### Setup
+1. Clone or use the repository at `/Users/galagrove/Projects/YSL/YSLv6Hub-main`
+2. Install dependencies: `npm install`
+3. Copy `.env.example` to `.env` for E2E testing credentials
+
+### Development
 1. Edit the TypeScript files in this directory
-2. Deploy to Google Apps Script with `clasp push`
-3. Access your project in the Google Apps Script editor
+2. Run unit tests: `npm test`
+3. Run E2E tests: `npm run test:e2e`
+4. Deploy to Google Apps Script: `clasp push`
+5. Access your project in the Google Apps Script editor
+
+### Testing
+- **Unit Tests**: `npm test` - Fast local testing with mocked GAS APIs
+- **E2E Tests**: `npm run test:e2e` - Full browser testing with Puppeteer
+- **Watch Mode**: `npm run test:watch` - Auto-run tests on file changes
+- **Coverage**: `npm run test:coverage` - Generate test coverage reports
 
 ## Getting Started
 
@@ -46,7 +75,7 @@ Key files:
 3. Copy all TypeScript files from this repository into the Apps Script editor
 4. Save and close the editor
 5. Refresh your spreadsheet
-6. Use the "YSL v6 Hub" menu > "System" > "System Configuration"
+6. Use the "YSL Hub Enhanced" menu > "Initialize Blank Spreadsheet"
 7. Follow the initialization wizard
 
 ### For Existing YSL Hub Spreadsheets
@@ -54,7 +83,7 @@ Key files:
 2. Copy all TypeScript files from this repository into the Apps Script editor
 3. Save and close the editor
 4. Refresh your spreadsheet
-5. Use the "YSL v6 Hub" menu > "System" > "Apply Configuration Changes"
+5. Use the "YSL Hub Enhanced" menu > "System Configuration"
 
 ## Module Structure
 
@@ -74,13 +103,26 @@ Key files:
 - `13_VersionControlActions.ts`: Version control actions
 - `14_DebugModule.ts`: Debugging utilities
 - `15_DynamicInstructorSheet.ts`: Group Lesson Tracker generation
+- `16_InstallTrigger.ts`: Installation triggers
+- `17_MenuFix.ts`: Menu system fixes
+- `18_SyncFunctions.ts`: Data synchronization
+
+## Deployment
+
+This project is configured to deploy to Google Apps Script ID: `17mxN2QUfg6sWx7X88TYeJ_ceaxjp8g07b6MivqFzqnv0-u8Y60tEM9FV`
+
+To deploy:
+```bash
+clasp push
+```
 
 ## Support
 
 For support or to report issues, please contact:
 - ssullivan@penbayymca.org
+- GitHub: https://github.com/srysull/YSLv6Hub
 
 ## Version
 
 YSLv6Hub v6.0.5
-Last Updated: May 18, 2025
+Last Updated: May 27, 2025

@@ -43,11 +43,11 @@ function initializeVersionControl() {
         notes: 'Initial system installation'
       }]));
       
-      logMessage('Version control initialized', 'INFO');
+      logMessage_VersionControl('Version control initialized', 'INFO');
     }
     return true;
   } catch (error) {
-    logMessage(`Error initializing version control: ${error.message}`, 'ERROR');
+    logMessage_VersionControl(`Error initializing version control: ${error.message}`, 'ERROR');
     return false;
   }
 }
@@ -77,7 +77,7 @@ function getVersionInfo() {
       updateLog = JSON.parse(updateLogJson);
     }
   } catch (error) {
-    logMessage(`Error parsing update log: ${error.message}`, 'ERROR');
+    logMessage_VersionControl(`Error parsing update log: ${error.message}`, 'ERROR');
     updateLog = [];
   }
   
@@ -115,7 +115,7 @@ function recordUpdate(version, notes) {
         updateLog = JSON.parse(updateLogJson);
       }
     } catch (error) {
-      logMessage(`Error parsing update log: ${error.message}`, 'ERROR');
+      logMessage_VersionControl(`Error parsing update log: ${error.message}`, 'ERROR');
       updateLog = [];
     }
     
@@ -129,10 +129,10 @@ function recordUpdate(version, notes) {
     // Save update log
     scriptProps.setProperty(VERSION_PROPS.UPDATE_LOG, JSON.stringify(updateLog));
     
-    logMessage(`System updated to version ${version}: ${notes}`, 'INFO');
+    logMessage_VersionControl(`System updated to version ${version}: ${notes}`, 'INFO');
     return true;
   } catch (error) {
-    logMessage(`Error recording update: ${error.message}`, 'ERROR');
+    logMessage_VersionControl(`Error recording update: ${error.message}`, 'ERROR');
     return false;
   }
 }
@@ -236,10 +236,10 @@ function runDiagnostics() {
   }
   
   // Log diagnostics result
-  logMessage(`System diagnostics run: ${diagnostics.status}`, 'INFO');
+  logMessage_VersionControl(`System diagnostics run: ${diagnostics.status}`, 'INFO');
   if (diagnostics.issues.length > 0) {
     for (const issue of diagnostics.issues) {
-      logMessage(`Diagnostic issue: ${issue}`, 'WARNING');
+      logMessage_VersionControl(`Diagnostic issue: ${issue}`, 'WARNING');
     }
   }
   
@@ -284,7 +284,7 @@ function showDiagnostics() {
  * @param message - Message to log
  * @param level - Log level (INFO, WARNING, ERROR)
  */
-function logMessage(message, level = 'INFO') {
+function logMessage_VersionControl(message, level = 'INFO') {
   // If ErrorHandling module exists, use its logMessage function
   if (typeof ErrorHandling !== 'undefined' && typeof ErrorHandling.logMessage === 'function') {
     ErrorHandling.logMessage(message, level);
@@ -320,7 +320,7 @@ function clearCache() {
     scriptProps.deleteProperty(prop);
   }
   
-  logMessage('System cache cleared manually', 'INFO');
+  logMessage_VersionControl('System cache cleared manually', 'INFO');
   
   SpreadsheetApp.getUi().alert(
     'Cache Cleared',
@@ -331,6 +331,7 @@ function clearCache() {
 }
 
 // Global variable export
+// @ts-ignore - Global variable declaration
 const VersionControl = {
   initializeVersionControl,
   getCurrentVersion,

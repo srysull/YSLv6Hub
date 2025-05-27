@@ -307,7 +307,7 @@ function performSystemHealthCheck() {
     currentRow++;
     
     // Get configuration
-    const config = AdministrativeModule && typeof AdministrativeModule.getSystemConfiguration === 'function' ?
+    const config: any = AdministrativeModule && typeof AdministrativeModule.getSystemConfiguration === 'function' ?
       AdministrativeModule.getSystemConfiguration() : {};
     
     // Add headers

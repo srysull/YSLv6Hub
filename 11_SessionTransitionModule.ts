@@ -1095,7 +1095,9 @@ function importNewSessionData(targetSession) {
     
     if (criteriaResult === ui.Button.YES) {
       // Try to import criteria
-      DataIntegrationModule.pullAssessmentCriteria();
+      const config: any = AdministrativeModule && typeof AdministrativeModule.getSystemConfiguration === 'function' ?
+        AdministrativeModule.getSystemConfiguration() : {};
+      DataIntegrationModule.pullAssessmentCriteria(config.swimmerRecordsUrl || '');
     }
     
     // Update status
