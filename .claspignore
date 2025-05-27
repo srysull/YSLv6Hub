@@ -1,0 +1,43 @@
+# Ignore TypeScript files that have compiled .gs versions
+00_TriggerFunctions.gs
+01_Globals.gs
+02_ErrorHandling.gs
+03_VersionControl.gs
+04_AdministrativeModule.gs
+05_MenuWrappers.gs
+15_DynamicInstructorSheet.gs
+SyncMenu.gs
+SyncMenu.js
+sync_function.js
+sync_function.ts
+
+# Ignore all development and build files
+node_modules/**
+tests/**
+e2e/**
+**/*.test.ts
+**/*.test.js
+**/*.spec.ts
+**/*.spec.js
+
+# Ignore config files
+tsconfig.json
+package.json
+package-lock.json
+jest.config.js
+jest-puppeteer.config.js
+jest.e2e.config.js
+globals.d.ts
+.env*
+.gitignore
+.claspignore
+
+# Ignore documentation files
+README_TESTING.md
+TEST_FIX_SUMMARY.md
+TESTING.md
+PROJECT_DOCS.md
+MENU_*.md
+
+# Ignore template files
+templates/**
