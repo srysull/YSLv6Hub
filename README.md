@@ -2,6 +2,34 @@
 
 YSLv6Hub is a comprehensive Google Workspace system for managing the Youth Swim Lessons (YSL) program at PenBay YMCA. This enhanced version adds several key improvements to make the system more robust, user-friendly, and feature-rich.
 
+## 🚨 CRITICAL ISSUE TO FIX NEXT SESSION
+
+**The menu is not displaying after spreadsheet reload!** This is a recurring issue that needs immediate attention.
+
+### What needs to be done:
+1. **Fix the onOpen trigger** - The menu creation function is not being called properly by Google Apps Script
+2. **Debug why the onOpen function isn't recognized** - Check if it's a naming issue, export issue, or trigger installation issue
+3. **Implement pre-push testing protocol** that includes:
+   - Verify menu displays after deployment
+   - Test onOpen trigger functionality
+   - Ensure all menu items are accessible
+   - Add automated test to check menu presence
+4. **Create a permanent fix** that ensures the menu ALWAYS displays
+5. **Add this to the testing checklist** for every future deployment
+
+### Current attempts that haven't worked:
+- Created 00_OnOpen.ts with standalone onOpen function
+- Created InstallOnOpenTrigger.ts for trigger management
+- Exported onOpen from multiple files
+- Set initialization properties
+
+### Next debugging steps:
+1. Check if Google Apps Script sees the onOpen function
+2. Verify the function name isn't being mangled during compilation
+3. Check if clasp deployment is properly handling the trigger
+4. Consider using a different approach like installable triggers
+5. Test with a minimal onOpen function to isolate the issue
+
 ## Project Structure
 
 This project uses clasp's direct TypeScript compilation capability to deploy TypeScript files directly to Google Apps Script.
